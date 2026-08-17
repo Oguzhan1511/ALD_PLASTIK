@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { usePathname } from "next/navigation";
 import { Sidebar } from "./Sidebar";
+import { GlobalJobNotifier } from "./GlobalJobNotifier";
 
 export function ClientLayoutWrapper({
   children,
@@ -60,6 +61,7 @@ export function ClientLayoutWrapper({
           
           {children}
         </main>
+        <GlobalJobNotifier />
       </div>
     );
   }
