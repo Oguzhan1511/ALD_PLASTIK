@@ -81,4 +81,5 @@ export const authOptions: AuthOptions = {
       return session;
     },
   },
+  secret: process.env.NEXTAUTH_SECRET || "default_secret_key_change_this_in_production",
 };
