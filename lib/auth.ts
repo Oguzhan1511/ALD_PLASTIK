@@ -35,7 +35,7 @@ export const authOptions: AuthOptions = {
   ],
   session: {
     strategy: "jwt",
-    maxAge: 24 * 60 * 60, // 24 saat
+    maxAge: 30 * 24 * 60 * 60, // 30 days
   },
   cookies: {
     sessionToken: {
@@ -46,6 +46,7 @@ export const authOptions: AuthOptions = {
         path: "/",
         secure: process.env.NODE_ENV === "production",
         domain: ".ogzsystem.com",
+        maxAge: 30 * 24 * 60 * 60, // Persistent for 30 days
       },
     },
   },
