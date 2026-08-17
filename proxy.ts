@@ -12,10 +12,31 @@ export async function proxy(request: NextRequest) {
 
   if (isPublicPath) return NextResponse.next();
 
-  const token = await getToken({
-    req: request,
-    secret: "ogzsystem-ald-plastik-shared-secret-2026-v2",
-  });
+  const secureCookieValue = request.cookies.get("__Secure-next-auth.session-token")?.value;
+  const normalCookieValue = request.cookies.get("next-auth.session-token")?.value;
+  const rawToken = secureCookieValue || normalCookieValue;
+
+  let token = null;
+  if (rawToken) {
+    try {
+      token = await getToken({
+        req: request,
+        secret: "ogzsystem-ald-plastik-shared-secret-2026-v2",
+        raw: false,
+      });
+      // Fallback manual decode if getToken fails
+      if (!token) {
+        const { decode } = await import("next-auth/jwt");
+        token = await decode({
+          token: rawToken,
+          secret: "ogzsystem-ald-plastik-shared-secret-2026-v2",
+          salt: secureCookieValue ? "__Secure-next-auth.session-token" : "next-auth.session-token",
+        });
+      }
+    } catch (error) {
+      console.error("Token decode error:", error);
+    }
+  }
 
   if (!token) {
     const loginUrl = new URL("https://ogzsystem.com/admin/login");
