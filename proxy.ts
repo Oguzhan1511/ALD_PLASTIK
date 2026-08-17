@@ -15,39 +15,31 @@ export async function proxy(request: NextRequest) {
   const secureCookieValue = request.cookies.get("__Secure-next-auth.session-token")?.value;
   const normalCookieValue = request.cookies.get("next-auth.session-token")?.value;
   const rawToken = secureCookieValue || normalCookieValue;
+  const cookieName = secureCookieValue ? "__Secure-next-auth.session-token" : "next-auth.session-token";
 
-  let token = null;
+  let isAuthenticated = false;
+
   if (rawToken) {
     try {
-      token = await getToken({
-        req: request,
-        secret: "ogzsystem-ald-plastik-shared-secret-2026-v2",
-        raw: false,
+      // Direct API verification to bypass all encryption/decryption issues
+      const res = await fetch("https://www.ogzsystem.com/api/auth/session", {
+        headers: {
+          cookie: `${cookieName}=${rawToken}`,
+        },
+        cache: "no-store"
       });
-      // Fallback manual decode if getToken fails
-      if (!token) {
-        const { decode } = await import("next-auth/jwt");
-        token = await decode({
-          token: rawToken,
-          secret: "ogzsystem-ald-plastik-shared-secret-2026-v2",
-          salt: secureCookieValue ? "__Secure-next-auth.session-token" : "next-auth.session-token",
-        });
+      const session = await res.json();
+      if (session && Object.keys(session).length > 0) {
+        isAuthenticated = true;
       }
     } catch (error) {
-      console.error("Token decode error:", error);
+      console.error("Session fetch error:", error);
     }
   }
 
-  if (!token) {
+  if (!isAuthenticated) {
     const loginUrl = new URL("https://ogzsystem.com/admin/login");
     loginUrl.searchParams.set("callbackUrl", `https://ald.ogzsystem.com${pathname}`);
-    
-    // Safely check if cookies exist
-    const c1 = request.cookies.get("__Secure-next-auth.session-token");
-    const c2 = request.cookies.get("next-auth.session-token");
-    loginUrl.searchParams.set("has_secure_cookie", c1 ? "yes" : "no");
-    loginUrl.searchParams.set("has_normal_cookie", c2 ? "yes" : "no");
-    
     return NextResponse.redirect(loginUrl);
   }
 
