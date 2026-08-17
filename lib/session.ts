@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 
 export async function getSharedSession() {
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   const secureCookie = cookieStore.get("__Secure-next-auth.session-token")?.value;
   const normalCookie = cookieStore.get("next-auth.session-token")?.value;
   const rawToken = secureCookie || normalCookie;
