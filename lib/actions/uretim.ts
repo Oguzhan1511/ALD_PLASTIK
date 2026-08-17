@@ -19,6 +19,9 @@ export async function getProductionRecords(limit?: number) {
       stockMovements: {
         include: { rawMaterial: true },
       },
+      productStockMovements: {
+        select: { type: true },
+      },
     },
   });
 }
@@ -41,6 +44,20 @@ export async function createProductionRecord(formData: FormData) {
 
   const date = dateStr ? new Date(dateStr) : new Date();
 
+  const result = await executeProduction(productId, quantity, date, description || null);
+
+  revalidatePath("/uretim");
+  revalidatePath("/hammaddeler");
+  revalidatePath("/hareketler");
+  revalidatePath("/");
+
+  return { success: true, data: result };
+}
+
+// ─────────────────────────────────────────────
+// Üretim Kaydı İç Mantığı (Onaylama için)
+// ─────────────────────────────────────────────
+export async function executeProduction(productId: string, quantity: number, date: Date, description: string | null) {
   // Ürün ve reçetelerini al — hem hammadde hem alt ürün bileşenleri dahil
   const product = await prisma.product.findUnique({
     where: { id: productId },
@@ -59,9 +76,9 @@ export async function createProductionRecord(formData: FormData) {
     throw new Error(`"${product.name}" ürünü için reçete tanımlanmamış. Önce /urunler sayfasından reçete ekleyin.`);
   }
 
-  // Sadece Hammadde satırlarını stok kontrolüne al
-  // (Alt Ürün satırları için miktar bilgisi henüz elle girilmeden 0 olabilir)
+  // Stok kontrolüne alınacak satırlar
   const hammaddeRecipes = product.recipes.filter((r) => r.rawMaterialId && r.rawMaterial);
+  const urunRecipes = product.recipes.filter((r) => r.componentProductId && r.componentProduct);
 
   // ─── Stok Yeterlilik Kontrolü (işlem öncesi — kullanıcıya hızlı geri bildirim) ───
   const stockErrors: string[] = [];
@@ -77,6 +94,21 @@ export async function createProductionRecord(formData: FormData) {
     if (available.lessThan(required)) {
       stockErrors.push(
         `Yetersiz stok: ${rawMaterial.name} — Gereken: ${required.toFixed(2)} ${rawMaterial.unit}, Mevcut: ${available.toFixed(2)} ${rawMaterial.unit}`
+      );
+    }
+  }
+
+  for (const recipe of urunRecipes) {
+    const componentProduct = recipe.componentProduct!;
+    if (new Decimal(recipe.quantityPerUnit).equals(0)) continue;
+
+    const wasteFactor = new Decimal(1).add(new Decimal(recipe.wastePercentage));
+    const required = new Decimal(recipe.quantityPerUnit).mul(quantity).mul(wasteFactor);
+    const available = new Decimal(componentProduct.currentStock);
+
+    if (available.lessThan(required)) {
+      stockErrors.push(
+        `Yetersiz stok: ${componentProduct.name} (Alt Ürün) — Gereken: ${required.toFixed(2)} adet, Mevcut: ${available.toFixed(2)} adet`
       );
     }
   }
@@ -139,6 +171,46 @@ export async function createProductionRecord(formData: FormData) {
       });
     }
 
+    // 2.5 Alt Ürün reçete satırları için stok düş + hareket kaydet
+    for (const recipe of urunRecipes) {
+      const componentProduct = recipe.componentProduct!;
+      if (new Decimal(recipe.quantityPerUnit).equals(0)) continue;
+
+      const wasteFactor = new Decimal(1).add(new Decimal(recipe.wastePercentage));
+      const deductAmount = new Decimal(recipe.quantityPerUnit).mul(quantity).mul(wasteFactor);
+
+      const updateResult = await tx.product.updateMany({
+        where: {
+          id: recipe.componentProductId!,
+          currentStock: { gte: deductAmount.toNumber() },
+        },
+        data: { currentStock: { decrement: deductAmount.toNumber() } },
+      });
+
+      if (updateResult.count === 0) {
+        throw new Error(
+          `Yetersiz stok: ${componentProduct.name} (Alt Ürün) — işlem sırasında stok değişti, lütfen tekrar deneyin.`
+        );
+      }
+
+      await tx.productStockMovement.create({
+        data: {
+          productId: recipe.componentProductId!,
+          type: "ALT_MONTAJ_CIKISI",
+          quantity: -deductAmount.toNumber(),
+          date,
+          description: `${product.name} üretimi için alt ürün çıkışı`,
+          productionRecordId: productionRecord.id,
+        },
+      });
+
+      movements.push({
+        rawMaterialName: componentProduct.name, // using same key for frontend preview
+        unit: "adet",
+        amount: deductAmount.toNumber(),
+      });
+    }
+
     // 3. Ürün stoğunu artır + ProductStockMovement kaydet
     await tx.product.update({
       where: { id: productId },
@@ -159,10 +231,107 @@ export async function createProductionRecord(formData: FormData) {
     return { productionRecord, movements, productName: product.name, quantity };
   });
 
+  return result;
+}
+
+// ─────────────────────────────────────────────
+// Üretim Kaydı İptal (Rollback)
+// ─────────────────────────────────────────────
+export async function cancelProductionRecord(productionRecordId: string) {
+  await requireAuth();
+
+  const record = await prisma.productionRecord.findUnique({
+    where: { id: productionRecordId },
+    include: {
+      product: true,
+      stockMovements: {
+        include: { rawMaterial: true },
+      },
+      productStockMovements: true,
+    },
+  });
+
+  if (!record) throw new Error("Üretim kaydı bulunamadı.");
+
+  // İptal edilmiş kayıtları tekrar iptal etme kontrolü
+  const alreadyCancelled = record.productStockMovements.some(
+    (m) => m.type === "URETIM_IPTALI"
+  );
+  if (alreadyCancelled) throw new Error("Bu üretim kaydı zaten iptal edilmiş.");
+
+  await prisma.$transaction(async (tx) => {
+    const now = new Date();
+    const cancelDesc = `Üretim iptali: ${record.product.name} - ${record.quantity} adet (Orijinal kayıt: ${new Date(record.date).toLocaleDateString("tr-TR")})`;
+
+    // 1. Hammadde stoklarını geri yükle (her stok hareketi için tersine kayıt)
+    for (const movement of record.stockMovements) {
+      if (movement.type !== "URETIM_CIKISI") continue;
+
+      await tx.rawMaterial.update({
+        where: { id: movement.rawMaterialId },
+        data: { currentStock: { increment: movement.amount } },
+      });
+
+      await tx.stockMovement.create({
+        data: {
+          rawMaterialId: movement.rawMaterialId,
+          type: "URETIM_IPTALI",
+          amount: movement.amount, // pozitif = stok geri eklendi
+          date: now,
+          description: cancelDesc,
+          productionRecordId: record.id,
+        },
+      });
+    }
+
+    // 2. Üretimde kullanılan alt ürün stoklarını geri yükle
+    for (const psm of record.productStockMovements) {
+      if (psm.type !== "ALT_MONTAJ_CIKISI") continue;
+
+      await tx.product.update({
+        where: { id: psm.productId },
+        data: { currentStock: { increment: Math.abs(psm.quantity.toNumber()) } },
+      });
+
+      await tx.productStockMovement.create({
+        data: {
+          productId: psm.productId,
+          type: "URETIM_IPTALI",
+          quantity: Math.abs(psm.quantity.toNumber()), // pozitif = stok geri eklendi
+          date: now,
+          description: cancelDesc,
+          productionRecordId: record.id,
+        },
+      });
+    }
+
+    // 3. Üretilen ürünün stokunu düş (URETIM_GIRISI tersine çevrilir)
+    const productionGiris = record.productStockMovements.find(
+      (m) => m.type === "URETIM_GIRISI"
+    );
+    if (productionGiris) {
+      await tx.product.update({
+        where: { id: record.productId },
+        data: { currentStock: { decrement: productionGiris.quantity.toNumber() } },
+      });
+
+      await tx.productStockMovement.create({
+        data: {
+          productId: record.productId,
+          type: "URETIM_IPTALI",
+          quantity: -productionGiris.quantity.toNumber(), // negatif = stok düşüldü
+          date: now,
+          description: cancelDesc,
+          productionRecordId: record.id,
+        },
+      });
+    }
+  });
+
   revalidatePath("/uretim");
   revalidatePath("/hammaddeler");
   revalidatePath("/hareketler");
-  revalidatePath("/");
+  revalidatePath("/urunler");
 
-  return { success: true, data: result };
+  return { success: true };
 }

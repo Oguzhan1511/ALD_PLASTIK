@@ -5,9 +5,11 @@ import { getToken } from "next-auth/jwt";
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Giriş sayfası ve API auth rotaları hariç her şeyi koru
+  // Giriş sayfası ve API auth rotaları ile usta formları hariç her şeyi koru
   const isPublicPath =
-    pathname === "/login" || pathname.startsWith("/api/auth");
+    pathname === "/login" ||
+    pathname.startsWith("/api/auth") ||
+    pathname.startsWith("/u/");
 
   if (isPublicPath) return NextResponse.next();
 

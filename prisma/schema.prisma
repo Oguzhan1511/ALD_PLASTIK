@@ -6,28 +6,29 @@ generator client {
 }
 
 datasource db {
-  // To switch to PostgreSQL in production, change provider to "postgresql"
-  // and update DATABASE_URL in .env accordingly.
-  provider = "sqlite"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 // ─────────────────────────────────────────────
 // Hammadde (Raw Material)
 // ─────────────────────────────────────────────
 model RawMaterial {
-  id              String   @id @default(cuid())
-  name            String   @unique
-  code            String?  @unique // Hammadde kodu (örn. 951013H)
-  unit            String   // gram, kg, litre, adet, vb.
-  currentStock    Decimal  @default(0)
-  criticalLevel   Decimal? // Opsiyonel — bu seviyenin altına düşünce uyarı
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id            String   @id @default(cuid())
+  name          String   @unique
+  code          String?  // Hammadde kodu (örn. 951013H)
+  unit          String // gram, kg, litre, adet, vb.
+  currentStock  Decimal  @default(0)
+  criticalLevel Decimal? // Opsiyonel — bu seviyenin altına düşünce uyarı
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  isDeleted     Boolean  @default(false)
 
   // İlişkiler
-  recipes         Recipe[]
-  stockMovements  StockMovement[]
+  recipes        Recipe[]
+  stockMovements StockMovement[]
+  pendingEntries PendingEntry[]
 
   @@map("raw_materials")
 }
@@ -36,22 +37,26 @@ model RawMaterial {
 // Ürün (Product)
 // ─────────────────────────────────────────────
 model Product {
-  id               String   @id @default(cuid())
-  name             String
-  code             String?  @unique // İşletmenin ürün kodu (örn. "602051Z")
-  parentProduct    String?  // Ait olduğu mamül
-  unitWeight       Decimal? // Bir adedinin toplam gramajı (bilgi amaçlı)
-  currentStock     Decimal  @default(0) // Mevcut ürün stoku (adet)
-  criticalLevel    Decimal? // Bu seviyenin altına düşünce uyarı
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  id            String   @id @default(cuid())
+  name          String
+  code          String?  // İşletmenin ürün kodu (örn. "602051Z")
+  parentProduct String? // Ait olduğu mamül
+  unitWeight    Decimal? // Bir adedinin toplam gramajı (bilgi amaçlı)
+  currentStock  Decimal  @default(0) // Mevcut ürün stoku (adet)
+  criticalLevel Decimal? // Bu seviyenin altına düşünce uyarı
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  isDeleted     Boolean  @default(false)
 
   // Bu ürünün kendi reçete satırları (bu ürünü yapmak için gerekenler)
-  recipes           Recipe[]  @relation("RecipeParentProduct")
+  recipes               Recipe[]               @relation("RecipeParentProduct")
   // Bu ürünün başka ürünlerin reçetesinde bileşen olarak geçtiği satırlar
-  componentInRecipes Recipe[] @relation("RecipeComponentProduct")
-  productionRecords  ProductionRecord[]
+  componentInRecipes    Recipe[]               @relation("RecipeComponentProduct")
+  productionRecords     ProductionRecord[]
   productStockMovements ProductStockMovement[]
+  shipmentGroupItems    ShipmentGroupItem[]
+  shipmentRecords       ShipmentRecord[]
+  pendingEntries        PendingEntry[]
 
   @@map("products")
 }
@@ -61,20 +66,20 @@ model Product {
 // Çok seviyeli BOM: bir ürün için hammadde VEYA alt ürün bileşeni
 // ─────────────────────────────────────────────
 model Recipe {
-  id                 String      @id @default(cuid())
-  productId          String      // Üst ürün (bu reçete kimin için?)
+  id        String @id @default(cuid())
+  productId String // Üst ürün (bu reçete kimin için?)
 
   // Bileşen — sadece biri dolu olur:
-  rawMaterialId      String?     // Hammadde bileşeni
-  componentProductId String?     // Alt Ürün bileşeni (çok seviyeli BOM)
+  rawMaterialId      String? // Hammadde bileşeni
+  componentProductId String? // Alt Ürün bileşeni (çok seviyeli BOM)
 
-  quantityPerUnit    Decimal     @default(0) // Bir adet üst ürün için gereken miktar
-  wastePercentage    Decimal     @default(0) // Fire oranı (örn. 0.03 = %3)
-  createdAt          DateTime    @default(now())
+  quantityPerUnit Decimal  @default(0) // Bir adet üst ürün için gereken miktar
+  wastePercentage Decimal  @default(0) // Fire oranı (örn. 0.03 = %3)
+  createdAt       DateTime @default(now())
 
-  product            Product      @relation("RecipeParentProduct", fields: [productId], references: [id], onDelete: Cascade)
-  rawMaterial        RawMaterial? @relation(fields: [rawMaterialId], references: [id], onDelete: Restrict)
-  componentProduct   Product?     @relation("RecipeComponentProduct", fields: [componentProductId], references: [id], onDelete: Restrict)
+  product          Product      @relation("RecipeParentProduct", fields: [productId], references: [id], onDelete: Cascade)
+  rawMaterial      RawMaterial? @relation(fields: [rawMaterialId], references: [id], onDelete: Restrict)
+  componentProduct Product?     @relation("RecipeComponentProduct", fields: [componentProductId], references: [id], onDelete: Restrict)
 
   // NOT: SQLite'da nullable sütunlar içeren composite unique güvenilmez davranır.
   // Tekrar kontrolü application layer'da (findFirst + skip) yapılmaktadır.
@@ -87,16 +92,16 @@ model Recipe {
 // SQLite does not support enums — type is enforced at application layer
 // ─────────────────────────────────────────────
 model StockMovement {
-  id                  String         @id @default(cuid())
-  rawMaterialId       String
-  type                String         // GIRIS | URETIM_CIKISI | MANUEL_CIKIS | DUZELTME
-  amount              Decimal        // Pozitif = giriş, negatif = çıkış (tip'e göre yorum)
-  date                DateTime       @default(now())
-  description         String?
-  productionRecordId  String?        // Üretimden geldiyse bağlantı
+  id                 String   @id @default(cuid())
+  rawMaterialId      String
+  type               String // GIRIS | URETIM_CIKISI | MANUEL_CIKIS | DUZELTME
+  amount             Decimal // Pozitif = giriş, negatif = çıkış (tip'e göre yorum)
+  date               DateTime @default(now())
+  description        String?
+  productionRecordId String? // Üretimden geldiyse bağlantı
 
-  rawMaterial         RawMaterial    @relation(fields: [rawMaterialId], references: [id], onDelete: Restrict)
-  productionRecord    ProductionRecord? @relation(fields: [productionRecordId], references: [id], onDelete: SetNull)
+  rawMaterial      RawMaterial       @relation(fields: [rawMaterialId], references: [id], onDelete: Restrict)
+  productionRecord ProductionRecord? @relation(fields: [productionRecordId], references: [id], onDelete: SetNull)
 
   @@map("stock_movements")
 }
@@ -105,34 +110,114 @@ model StockMovement {
 // Üretim Kaydı (Production Record)
 // ─────────────────────────────────────────────
 model ProductionRecord {
-  id            String   @id @default(cuid())
-  productId     String
-  quantity      Int      // Üretilen adet
-  date          DateTime @default(now())
-  description   String?
+  id          String   @id @default(cuid())
+  productId   String
+  quantity    Int // Üretilen adet
+  date        DateTime @default(now())
+  description String?
 
-  product       Product  @relation(fields: [productId], references: [id], onDelete: Restrict)
-  stockMovements StockMovement[]
+  product               Product                @relation(fields: [productId], references: [id], onDelete: Restrict)
+  stockMovements        StockMovement[]
   productStockMovements ProductStockMovement[]
+  pendingEntries        PendingEntry[]
 
   @@map("production_records")
 }
 
 // ─────────────────────────────────────────────
 // Ürün Stok Hareketi (Product Stock Movement)
-// type: URETIM_GIRISI | SATIS_CIKISI | MANUEL_GIRIS | MANUEL_CIKIS | DUZELTME
+// type: URETIM_GIRISI | SATIS_CIKISI | MANUEL_GIRIS | MANUEL_CIKIS | DUZELTME | ALT_MONTAJ_CIKISI | SEVKIYAT_CIKISI
 // ─────────────────────────────────────────────
 model ProductStockMovement {
   id                 String   @id @default(cuid())
   productId          String
-  type               String   // URETIM_GIRISI | SATIS_CIKISI | MANUEL_GIRIS | MANUEL_CIKIS | DUZELTME
-  quantity           Decimal  // Pozitif = giriş, negatif = çıkış
+  type               String // URETIM_GIRISI | SATIS_CIKISI | MANUEL_GIRIS | MANUEL_CIKIS | DUZELTME | ALT_MONTAJ_CIKISI | SEVKIYAT_CIKISI
+  quantity           Decimal // Pozitif = giriş, negatif = çıkış
   date               DateTime @default(now())
   description        String?
-  productionRecordId String?  // Üretimden geldiyse bağlantı
+  productionRecordId String? // Üretimden geldiyse bağlantı
+  shipmentRecordId   String? // Sevkiyattan geldiyse bağlantı
 
-  product            Product           @relation(fields: [productId], references: [id], onDelete: Restrict)
-  productionRecord   ProductionRecord? @relation(fields: [productionRecordId], references: [id], onDelete: SetNull)
+  product          Product           @relation(fields: [productId], references: [id], onDelete: Restrict)
+  productionRecord ProductionRecord? @relation(fields: [productionRecordId], references: [id], onDelete: SetNull)
+  shipmentRecord   ShipmentRecord?   @relation(fields: [shipmentRecordId], references: [id], onDelete: SetNull)
 
   @@map("product_stock_movements")
+}
+
+// ─────────────────────────────────────────────
+// Sevkiyat Grubu (Shipment Group) - Şablon
+// ─────────────────────────────────────────────
+model ShipmentGroup {
+  id   String  @id @default(cuid())
+  code String? 
+  name String  
+
+  items           ShipmentGroupItem[]
+  shipmentRecords ShipmentRecord[]
+  isDeleted       Boolean @default(false)
+
+  @@map("shipment_groups")
+}
+
+// ─────────────────────────────────────────────
+// Sevkiyat Grubu İçeriği (Shipment Group Item)
+// ─────────────────────────────────────────────
+model ShipmentGroupItem {
+  id              String  @id @default(cuid())
+  shipmentGroupId String
+  productId       String
+  quantityPerUnit Decimal
+
+  shipmentGroup ShipmentGroup @relation(fields: [shipmentGroupId], references: [id], onDelete: Cascade)
+  product       Product       @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@unique([shipmentGroupId, productId])
+  @@map("shipment_group_items")
+}
+
+// ─────────────────────────────────────────────
+// Sevkiyat Kaydı (Shipment Record)
+// ─────────────────────────────────────────────
+model ShipmentRecord {
+  id              String   @id @default(cuid())
+  type            String // TEKIL_URUN | GRUP
+  productId       String?
+  shipmentGroupId String?
+  quantity        Decimal
+  date            DateTime @default(now())
+  description     String?
+
+  product       Product?       @relation(fields: [productId], references: [id], onDelete: Restrict)
+  shipmentGroup ShipmentGroup? @relation(fields: [shipmentGroupId], references: [id], onDelete: Restrict)
+
+  productStockMovements ProductStockMovement[]
+  pendingEntries        PendingEntry[]
+
+  @@map("shipment_records")
+}
+
+// ─────────────────────────────────────────────
+// Onay Bekleyen Kayıt (Pending Entry)
+// ─────────────────────────────────────────────
+model PendingEntry {
+  id                 String    @id @default(cuid())
+  type               String    // URETIM | SEVKIYAT | SEVKIYAT_GIRISI | SEVKIYAT_CIKISI
+  productId          String?
+  rawMaterialId      String?
+  quantity           Decimal
+  submittedByName    String
+  status             String    @default("BEKLIYOR") // BEKLIYOR | ONAYLANDI | REDDEDILDI
+  submittedAt        DateTime  @default(now())
+  reviewedAt         DateTime?
+  rejectionReason    String?
+  productionRecordId String?
+  shipmentRecordId   String?
+
+  product          Product?          @relation(fields: [productId], references: [id], onDelete: Restrict)
+  rawMaterial      RawMaterial?      @relation(fields: [rawMaterialId], references: [id], onDelete: Restrict)
+  productionRecord ProductionRecord? @relation(fields: [productionRecordId], references: [id], onDelete: SetNull)
+  shipmentRecord   ShipmentRecord?   @relation(fields: [shipmentRecordId], references: [id], onDelete: SetNull)
+
+  @@map("pending_entries")
 }

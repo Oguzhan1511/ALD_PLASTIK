@@ -11,6 +11,7 @@ import { parseDecimalInput } from "@/lib/utils";
 export async function getProducts() {
   await requireAuth();
   return prisma.product.findMany({
+    where: { isDeleted: false },
     orderBy: { name: "asc" },
     include: {
       recipes: {
@@ -47,8 +48,12 @@ export async function createProduct(formData: FormData) {
   }
 
   if (codeRaw) {
-    const existingCode = await prisma.product.findUnique({ where: { code: codeRaw } });
-    if (existingCode) throw new Error(`"${codeRaw}" kodu zaten başka bir ürüne ait.`);
+    const existingCode = await prisma.product.findFirst({ where: { code: codeRaw } });
+    if (existingCode) {
+      warningMessage = warningMessage 
+        ? warningMessage + ` Ayrıca "${codeRaw}" kodu başka bir üründe de kullanılıyor.`
+        : `"${codeRaw}" kodu başka bir üründe de kullanılıyor, yine de kaydedildi.`;
+    }
   }
 
   const recipesRaw = formData.get("recipes") as string;
@@ -66,7 +71,8 @@ export async function createProduct(formData: FormData) {
       parentProduct,
       recipes: recipesToCreate.length > 0 ? {
         create: recipesToCreate.map(r => ({
-          rawMaterialId: r.rawMaterialId,
+          rawMaterialId: r.rawMaterialId || null,
+          componentProductId: r.componentProductId || null,
           quantityPerUnit: parseFloat(r.quantityPerUnit),
           wastePercentage: (parseFloat(r.wastePercentage) || 0) / 100
         }))
@@ -107,7 +113,11 @@ export async function updateProduct(id: string, formData: FormData) {
     const existingCode = await prisma.product.findFirst({
       where: { code: codeRaw, NOT: { id } },
     });
-    if (existingCode) throw new Error(`"${codeRaw}" kodu zaten başka bir ürüne ait.`);
+    if (existingCode) {
+      warningMessage = warningMessage 
+        ? warningMessage + ` Ayrıca "${codeRaw}" kodu başka bir üründe de kullanılıyor.`
+        : `"${codeRaw}" kodu başka bir üründe de kullanılıyor, yine de kaydedildi.`;
+    }
   }
 
   await prisma.product.update({
@@ -125,15 +135,6 @@ export async function updateProduct(id: string, formData: FormData) {
 export async function deleteProduct(id: string) {
   await requireAuth();
 
-  const productionCount = await prisma.productionRecord.count({
-    where: { productId: id },
-  });
-  if (productionCount > 0) {
-    throw new Error(
-      "Bu ürüne ait üretim kaydı bulunuyor. Ürün silinemez."
-    );
-  }
-
   const componentCount = await prisma.recipe.count({
     where: { componentProductId: id },
   });
@@ -143,17 +144,30 @@ export async function deleteProduct(id: string) {
     );
   }
 
-  const stockMovementCount = await prisma.productStockMovement.count({
-    where: { productId: id },
-  });
-  if (stockMovementCount > 0) {
-    throw new Error(
-      "Bu ürünün stok hareketi geçmişi var, silinemez. (Dilerseniz stok miktarını 0'a çekebilirsiniz)"
-    );
-  }
+  const product = await prisma.product.findUnique({ where: { id } });
+  if (!product) throw new Error("Ürün bulunamadı.");
 
-  // Recipes will be cascade deleted
-  await prisma.product.delete({ where: { id } });
+  // Soft delete product and log movement
+  await prisma.$transaction(async (tx) => {
+    // 1. Bu ürünün kendi reçete satırlarını sil (örfün reçetesi)
+    await tx.recipe.deleteMany({ where: { productId: id } });
+
+    // 2. Mark as deleted and zero out stock
+    await tx.product.update({ 
+      where: { id },
+      data: { isDeleted: true, currentStock: 0 }
+    });
+
+    // 3. Log movement if there was stock, or just log deletion
+    await tx.productStockMovement.create({
+      data: {
+        productId: id,
+        type: "DUZELTME",
+        quantity: -Number(product.currentStock),
+        description: `Sistem: Ürün silindi (Pasife alındı). Mevcut stok (${product.currentStock}) sıfırlandı.`,
+      }
+    });
+  });
 
   revalidatePath("/urunler");
   revalidatePath("/uretim");

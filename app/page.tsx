@@ -18,9 +18,11 @@ async function getDashboardData() {
     recentProductions,
     recentMovementsRaw,
     recentProductMovementsRaw,
+    pendingReportsCountRaw,
   ] = await Promise.all([
-    prisma.rawMaterial.findMany({ orderBy: { name: "asc" } }),
+    prisma.rawMaterial.findMany({ where: { isDeleted: false }, orderBy: { name: "asc" } }),
     prisma.product.findMany({
+      where: { isDeleted: false },
       orderBy: { name: "asc" },
       select: { id: true, name: true, code: true, currentStock: true, criticalLevel: true },
     }),
@@ -42,6 +44,9 @@ async function getDashboardData() {
       take: 8,
       orderBy: { date: "desc" },
       include: { product: { select: { name: true } } },
+    }),
+    prisma.pendingEntry.count({
+      where: { status: "BEKLIYOR" },
     }),
   ]);
 
@@ -88,6 +93,7 @@ async function getDashboardData() {
     thisMonthTotal,
     recentProductions,
     recentMovements: unifiedMovements,
+    pendingReportsCount: pendingReportsCountRaw || 0,
   };
 }
 
@@ -101,6 +107,7 @@ export default async function DashboardPage() {
     thisMonthTotal,
     recentProductions,
     recentMovements,
+    pendingReportsCount,
   } = await getDashboardData();
 
   const movementTypeConfig: Record<string, { label: string; className: string; sign: string }> = {
@@ -110,6 +117,7 @@ export default async function DashboardPage() {
     // Ürün
     URETIM_GIRISI: { label: "Üretim Girişi", className: "badge-blue", sign: "+" },
     SATIS_CIKISI: { label: "Satış Çıkışı", className: "badge-red", sign: "-" },
+    SEVKIYAT_GIRISI: { label: "Sevkiyat Girişi", className: "badge-green", sign: "+" },
     // Ortak
     MANUEL_GIRIS: { label: "Manuel Giriş", className: "badge-green", sign: "+" },
     MANUEL_CIKIS: { label: "Manuel Çıkış", className: "badge-orange", sign: "-" },
@@ -133,61 +141,28 @@ export default async function DashboardPage() {
       </div>
 
       <div className="page-body space-y-6">
-        {/* Özet Kartlar */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="stat-card">
-            <div className="flex items-center justify-between mb-3">
-              <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-                </svg>
-              </div>
-            </div>
-            <div className="text-3xl font-bold text-slate-800">{rawMaterials.length}</div>
-            <div className="text-sm text-slate-500 mt-1">Hammadde Çeşidi</div>
-          </div>
-
-          <div className={`stat-card ${criticalMaterials.length > 0 ? "border-red-200 bg-red-50" : ""}`}>
-            <div className="flex items-center justify-between mb-3">
-              <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${criticalMaterials.length > 0 ? "bg-red-100" : "bg-slate-100"}`}>
-                <svg className={`w-5 h-5 ${criticalMaterials.length > 0 ? "text-red-600" : "text-slate-400"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                </svg>
-              </div>
-            </div>
-            <div className={`text-3xl font-bold ${criticalMaterials.length > 0 ? "text-red-700" : "text-slate-800"}`}>
-              {criticalMaterials.length}
-            </div>
-            <div className="text-sm text-slate-500 mt-1">Kritik Stok</div>
-          </div>
-
-          <div className="stat-card">
-            <div className="flex items-center justify-between mb-3">
-              <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-                <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                </svg>
-              </div>
-            </div>
-            <div className="text-3xl font-bold text-slate-800">{thisMonthCount}</div>
-            <div className="text-sm text-slate-500 mt-1">Bu Ay Üretim</div>
-          </div>
-
-          <div className="stat-card">
-            <div className="flex items-center justify-between mb-3">
-              <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
-                <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" />
-                </svg>
-              </div>
-            </div>
-            <div className="text-3xl font-bold text-slate-800">
-              {thisMonthTotal.toLocaleString("tr-TR")}
-            </div>
-            <div className="text-sm text-slate-500 mt-1">Bu Ay Toplam Adet</div>
-          </div>
+        {/* Hızlı Erişim (Üstte) */}
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+          {[
+            { href: "/hammaddeler", label: "Hammadde Ekle", icon: "📦", color: "hover:border-blue-300 hover:bg-blue-50" },
+            { href: "/urunler", label: "Ürün & Reçete", icon: "📋", color: "hover:border-purple-300 hover:bg-purple-50" },
+            { href: "/uretim", label: "Üretim Girişi", icon: "⚙️", color: "hover:border-green-300 hover:bg-green-50" },
+            { href: "/urun-stok", label: "Ürün Stok", icon: "📊", color: "hover:border-orange-300 hover:bg-orange-50" },
+            { href: "/sevkiyat-girisi", label: "Sevkiyat Girişi", icon: "📥", color: "hover:border-sky-300 hover:bg-sky-50" },
+            { href: "/sevkiyat", label: "Sevkiyat Çıkışı", icon: "🚚", color: "hover:border-teal-300 hover:bg-teal-50" },
+          ].map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={`card p-4 text-center transition-all ${item.color} cursor-pointer`}
+            >
+              <div className="text-2xl mb-2">{item.icon}</div>
+              <div className="text-sm font-medium text-slate-600">{item.label}</div>
+            </Link>
+          ))}
         </div>
+
+
 
         {/* Kritik Stoklar */}
         {criticalMaterials.length > 0 && (
@@ -215,7 +190,7 @@ export default async function DashboardPage() {
                     <span className="font-medium text-red-800 text-sm">{m.name}</span>
                     <div className="flex items-center gap-3 text-sm">
                       <span className="text-red-600 font-semibold">
-                        {parseFloat(m.currentStock.toString()).toLocaleString("tr-TR", { maximumFractionDigits: 2 })} {m.unit}
+                        {parseFloat(m.currentStock.toString()).toLocaleString("tr-TR", { maximumFractionDigits: 5 })} {m.unit}
                       </span>
                       {m.criticalLevel && (
                         <span className="text-slate-400 text-xs">
@@ -334,7 +309,7 @@ export default async function DashboardPage() {
                   {recentMovements.map((m, i) => {
                     const cfg = movementTypeConfig[m.type] || { label: m.type, className: "badge-slate", sign: "" };
                     const amt = parseFloat(m.amount.toString());
-                    const isPositive = m.type === "GIRIS" || m.type === "URETIM_GIRISI" || m.type === "MANUEL_GIRIS";
+                    const isPositive = m.type === "GIRIS" || m.type === "URETIM_GIRISI" || m.type === "MANUEL_GIRIS" || m.type === "SEVKIYAT_GIRISI";
                     return (
                       <div
                         key={m.id}
@@ -347,7 +322,7 @@ export default async function DashboardPage() {
                           </span>
                         </div>
                         <span className={`text-sm font-semibold ${isPositive ? "text-green-600" : "text-red-600"}`}>
-                          {cfg.sign}{amt.toLocaleString("tr-TR", { maximumFractionDigits: 2 })} {m.unit}
+                          {cfg.sign}{amt.toLocaleString("tr-TR", { maximumFractionDigits: 5 })} {m.unit}
                         </span>
                       </div>
                     );
@@ -358,23 +333,74 @@ export default async function DashboardPage() {
           </div>
         </div>
 
-        {/* Hızlı Erişim */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          {[
-            { href: "/hammaddeler", label: "Hammadde Ekle", icon: "📦", color: "hover:border-blue-300 hover:bg-blue-50" },
-            { href: "/urunler", label: "Ürün & Reçete", icon: "📋", color: "hover:border-purple-300 hover:bg-purple-50" },
-            { href: "/uretim", label: "Üretim Girişi", icon: "⚙️", color: "hover:border-green-300 hover:bg-green-50" },
-            { href: "/urun-stok", label: "Ürün Stok", icon: "📤", color: "hover:border-orange-300 hover:bg-orange-50" },
-          ].map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`card p-4 text-center transition-all ${item.color} cursor-pointer`}
-            >
-              <div className="text-2xl mb-2">{item.icon}</div>
-              <div className="text-sm font-medium text-slate-600">{item.label}</div>
-            </Link>
-          ))}
+        {/* Özet Kartlar */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+          <div className="stat-card">
+            <div className="flex items-center justify-between mb-3">
+              <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                </svg>
+              </div>
+            </div>
+            <div className="text-3xl font-bold text-slate-800">{rawMaterials.length}</div>
+            <div className="text-sm text-slate-500 mt-1">Hammadde Çeşidi</div>
+          </div>
+
+          <Link href="/raporlar" className={`stat-card transition-colors ${pendingReportsCount > 0 ? "border-amber-200 bg-amber-50 hover:bg-amber-100 cursor-pointer" : "hover:bg-slate-50 cursor-pointer"}`}>
+            <div className="flex items-center justify-between mb-3">
+              <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${pendingReportsCount > 0 ? "bg-amber-100" : "bg-slate-100"}`}>
+                <svg className={`w-5 h-5 ${pendingReportsCount > 0 ? "text-amber-600" : "text-slate-400"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                </svg>
+              </div>
+            </div>
+            <div className={`text-3xl font-bold ${pendingReportsCount > 0 ? "text-amber-700" : "text-slate-800"}`}>
+              {pendingReportsCount}
+            </div>
+            <div className="text-sm text-slate-500 mt-1">Onay Bekleyen Rapor</div>
+          </Link>
+
+          <div className={`stat-card ${criticalMaterials.length > 0 ? "border-red-200 bg-red-50" : ""}`}>
+            <div className="flex items-center justify-between mb-3">
+              <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${criticalMaterials.length > 0 ? "bg-red-100" : "bg-slate-100"}`}>
+                <svg className={`w-5 h-5 ${criticalMaterials.length > 0 ? "text-red-600" : "text-slate-400"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              </div>
+            </div>
+            <div className={`text-3xl font-bold ${criticalMaterials.length > 0 ? "text-red-700" : "text-slate-800"}`}>
+              {criticalMaterials.length}
+            </div>
+            <div className="text-sm text-slate-500 mt-1">Kritik Stok</div>
+          </div>
+
+          <div className="stat-card">
+            <div className="flex items-center justify-between mb-3">
+              <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+                <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+              </div>
+            </div>
+            <div className="text-3xl font-bold text-slate-800">{thisMonthCount}</div>
+            <div className="text-sm text-slate-500 mt-1">Bu Ay Üretim</div>
+          </div>
+
+          <div className="stat-card">
+            <div className="flex items-center justify-between mb-3">
+              <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
+                <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" />
+                </svg>
+              </div>
+            </div>
+            <div className="text-3xl font-bold text-slate-800">
+              {thisMonthTotal.toLocaleString("tr-TR")}
+            </div>
+            <div className="text-sm text-slate-500 mt-1">Bu Ay Toplam Adet</div>
+          </div>
         </div>
       </div>
     </>

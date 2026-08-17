@@ -4,10 +4,11 @@ import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth-guard";
 
 // Valid movement types (enforced at app layer since SQLite has no enums)
-export type MovementType = "GIRIS" | "URETIM_CIKISI" | "MANUEL_CIKIS" | "DUZELTME";
+export type MovementType = "GIRIS" | "URETIM_CIKISI" | "MANUEL_CIKIS" | "DUZELTME" | "SEVKIYAT_GIRISI" | "SEVKIYAT_CIKISI";
 
 export interface MovementFilters {
   rawMaterialId?: string;
+  searchQuery?: string;
   type?: MovementType;
   startDate?: string;
   endDate?: string;
@@ -21,15 +22,27 @@ export interface MovementFilters {
 export async function getStockMovements(filters: MovementFilters = {}) {
   await requireAuth();
 
-  const { rawMaterialId, type, startDate, endDate, page = 1, pageSize = 20 } = filters;
+  const { rawMaterialId, searchQuery, type, startDate, endDate, page = 1, pageSize = 20 } = filters;
 
   const where: Record<string, unknown> = {};
 
   if (rawMaterialId) where.rawMaterialId = rawMaterialId;
+  if (searchQuery) {
+    where.rawMaterial = {
+      OR: [
+        { name: { contains: searchQuery } },
+        { code: { contains: searchQuery } }
+      ]
+    };
+  }
   if (type) where.type = type;
   if (startDate || endDate) {
     where.date = {};
-    if (startDate) (where.date as Record<string, unknown>).gte = new Date(startDate);
+    if (startDate) {
+      const start = new Date(startDate);
+      start.setHours(0, 0, 0, 0);
+      (where.date as Record<string, unknown>).gte = start;
+    }
     if (endDate) {
       const end = new Date(endDate);
       end.setHours(23, 59, 59, 999);
@@ -53,7 +66,7 @@ export async function getStockMovements(filters: MovementFilters = {}) {
     prisma.stockMovement.count({ where }),
   ]);
 
-  return { movements, total, page, pageSize, totalPages: Math.ceil(total / pageSize) };
+  return JSON.parse(JSON.stringify({ movements, total, page, pageSize, totalPages: Math.ceil(total / pageSize) }));
 }
 
 // ─────────────────────────────────────────────
@@ -75,5 +88,5 @@ export async function getStockCard(rawMaterialId: string) {
     }),
   ]);
 
-  return { rawMaterial, movements };
+  return JSON.parse(JSON.stringify({ rawMaterial, movements }));
 }

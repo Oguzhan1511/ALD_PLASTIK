@@ -16,13 +16,16 @@ export async function getProductStockMovements(productId?: string, limit?: numbe
     take: limit,
     include: {
       product: { select: { id: true, name: true, code: true } },
+      shipmentRecord: { include: { shipmentGroup: true } },
     },
   });
 }
 
 export interface ProductMovementFilters {
   productId?: string;
-  type?: string;
+  searchQuery?: string;
+  type?: string | string[];
+  shipmentType?: "TEKIL_URUN" | "GRUP";
   startDate?: string;
   endDate?: string;
   page?: number;
@@ -32,15 +35,37 @@ export interface ProductMovementFilters {
 export async function getProductStockMovementsPaginated(filters: ProductMovementFilters = {}) {
   await requireAuth();
 
-  const { productId, type, startDate, endDate, page = 1, pageSize = 20 } = filters;
+  const { productId, searchQuery, type, startDate, endDate, page = 1, pageSize = 20 } = filters;
 
   const where: Record<string, unknown> = {};
 
   if (productId) where.productId = productId;
-  if (type) where.type = type;
+  if (searchQuery) {
+    where.product = {
+      OR: [
+        { name: { contains: searchQuery } },
+        { code: { contains: searchQuery } },
+      ],
+    };
+  }
+  if (type) {
+    if (Array.isArray(type)) {
+      where.type = { in: type };
+    } else {
+      where.type = type;
+    }
+  }
+  if (type === "SEVKIYAT_CIKISI" && filters.shipmentType) {
+    where.shipmentRecord = { type: filters.shipmentType };
+  }
+  
   if (startDate || endDate) {
     where.date = {};
-    if (startDate) (where.date as Record<string, unknown>).gte = new Date(startDate);
+    if (startDate) {
+      const start = new Date(startDate);
+      start.setHours(0, 0, 0, 0);
+      (where.date as Record<string, unknown>).gte = start;
+    }
     if (endDate) {
       const end = new Date(endDate);
       end.setHours(23, 59, 59, 999);
@@ -56,13 +81,29 @@ export async function getProductStockMovementsPaginated(filters: ProductMovement
       take: pageSize,
       include: {
         product: true,
-        productionRecord: true,
+        productionRecord: {
+          include: {
+            productStockMovements: {
+              where: { type: "ALT_MONTAJ_CIKISI" },
+              include: { product: true }
+            }
+          }
+        },
+        shipmentRecord: { 
+          include: { 
+            shipmentGroup: true,
+            productStockMovements: {
+              where: { type: "SEVKIYAT_ALT_CIKISI" },
+              include: { product: true }
+            }
+          } 
+        },
       },
     }),
     prisma.productStockMovement.count({ where }),
   ]);
 
-  return { movements, total, page, pageSize, totalPages: Math.ceil(total / pageSize) };
+  return JSON.parse(JSON.stringify({ movements, total, page, pageSize, totalPages: Math.ceil(total / pageSize) }));
 }
 
 // ─────────────────────────────────────────────
@@ -71,6 +112,7 @@ export async function getProductStockMovementsPaginated(filters: ProductMovement
 export async function getProductsWithStock() {
   await requireAuth();
   return prisma.product.findMany({
+    where: { isDeleted: false },
     orderBy: { name: "asc" },
     select: {
       id: true,

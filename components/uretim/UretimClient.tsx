@@ -5,12 +5,21 @@ import { createProductionRecord } from "@/lib/actions/uretim";
 import { RawMaterial } from "@prisma/client";
 import { Decimal } from "@prisma/client/runtime/library";
 
+interface ProductBasic {
+  id: string;
+  name: string;
+  code: string | null;
+  currentStock: Decimal;
+}
+
 interface RecipeItem {
   id: string;
-  rawMaterialId: string;
+  rawMaterialId: string | null;
+  componentProductId: string | null;
   quantityPerUnit: Decimal;
   wastePercentage: Decimal;
-  rawMaterial: RawMaterial;
+  rawMaterial: RawMaterial | null;
+  componentProduct: ProductBasic | null;
 }
 
 interface ProductItem {
@@ -81,13 +90,20 @@ export function UretimClient({ products, recentProductions }: UretimClientProps)
     const wasteFactor = 1 + parseFloat(r.wastePercentage.toString());
     const perUnit = parseFloat(r.quantityPerUnit.toString());
     const wastePercent = parseFloat(r.wastePercentage.toString()) * 100;
+    
+    const name = r.rawMaterialId ? r.rawMaterial?.name : r.componentProduct?.name;
+    const unit = r.rawMaterialId ? r.rawMaterial?.unit : "adet";
+    const currentStock = r.rawMaterialId 
+       ? parseFloat(r.rawMaterial?.currentStock?.toString() || "0")
+       : parseFloat(r.componentProduct?.currentStock?.toString() || "0");
+
     return {
-      name: r.rawMaterial.name,
-      unit: r.rawMaterial.unit,
+      name,
+      unit,
       perUnit,
       wastePercent,
       total: perUnit * qty * wasteFactor,
-      currentStock: parseFloat(r.rawMaterial.currentStock.toString()),
+      currentStock,
     };
   });
 
@@ -313,13 +329,13 @@ export function UretimClient({ products, recentProductions }: UretimClientProps)
                               <div style={{ color: "var(--text-muted)" }}>
                                 Gerekli (fire dahil):{" "}
                                 <strong style={{ color: isInsufficient ? "var(--badge-red-text)" : "var(--text-secondary)" }}>
-                                  {item.total.toLocaleString("tr-TR", { maximumFractionDigits: 2 })} {item.unit}
+                                  {item.total.toLocaleString("tr-TR", { maximumFractionDigits: 5 })} {item.unit}
                                 </strong>
                               </div>
                               <div style={{ color: "var(--text-muted)" }}>
                                 Mevcut:{" "}
                                 <strong style={{ color: "var(--text-secondary)" }}>
-                                  {item.currentStock.toLocaleString("tr-TR", { maximumFractionDigits: 2 })} {item.unit}
+                                  {item.currentStock.toLocaleString("tr-TR", { maximumFractionDigits: 5 })} {item.unit}
                                 </strong>
                               </div>
                               <div style={{ color: "var(--text-muted)" }}>

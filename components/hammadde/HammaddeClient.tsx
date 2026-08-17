@@ -19,7 +19,7 @@ type ModalType = "create" | "edit" | "duzeltme" | "delete" | null;
 
 function formatStock(val: Decimal | number, unit: string) {
   const num = typeof val === "number" ? val : parseFloat(val.toString());
-  return `${num.toLocaleString("tr-TR", { maximumFractionDigits: 2 })} ${unit}`;
+  return `${num.toLocaleString("tr-TR", { maximumFractionDigits: 5 })} ${unit}`;
 }
 
 function isCritical(stock: Decimal | number, critical: Decimal | number | null): boolean {
@@ -82,9 +82,9 @@ export function HammaddeClient({ initialData }: HammaddeClientProps) {
     setError("");
     startTransition(async () => {
       try {
-        await createRawMaterial(formData);
+        const res = await createRawMaterial(formData);
         closeModal();
-        showSuccess("Hammadde başarıyla eklendi.");
+        showSuccess(res.warning || "Hammadde başarıyla eklendi.");
         window.location.reload();
       } catch (e: unknown) {
         setError((e as Error).message);
@@ -97,9 +97,9 @@ export function HammaddeClient({ initialData }: HammaddeClientProps) {
     setError("");
     startTransition(async () => {
       try {
-        await updateRawMaterial(selected.id, formData);
+        const res = await updateRawMaterial(selected.id, formData);
         closeModal();
-        showSuccess("Hammadde güncellendi.");
+        showSuccess(res.warning || "Hammadde güncellendi.");
         window.location.reload();
       } catch (e: unknown) {
         setError((e as Error).message);
@@ -164,7 +164,7 @@ export function HammaddeClient({ initialData }: HammaddeClientProps) {
         )}
 
         {/* Stats row */}
-        <div className="grid grid-cols-3 gap-4 mb-6">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
           <div className="stat-card">
             <div className="text-2xl font-bold text-slate-800">{data.length}</div>
             <div className="text-sm text-slate-500 mt-1">Toplam Hammadde</div>
@@ -190,7 +190,7 @@ export function HammaddeClient({ initialData }: HammaddeClientProps) {
             
             <div className="flex flex-1 w-full md:max-w-xl gap-3 items-center justify-end">
               {/* Arama Kutusu */}
-              <div className="relative flex-1 max-w-xs">
+              <div className="relative flex-1 w-full sm:max-w-xs">
                 <svg className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                 </svg>
@@ -369,7 +369,7 @@ export function HammaddeClient({ initialData }: HammaddeClientProps) {
               name="currentStock"
               type="number"
               min="0"
-              step="0.001"
+              step="0.0001"
               required
               defaultValue="0"
               className="form-input"
@@ -382,7 +382,7 @@ export function HammaddeClient({ initialData }: HammaddeClientProps) {
               name="criticalLevel"
               type="number"
               min="0"
-              step="0.001"
+              step="0.0001"
               className="form-input"
               placeholder="Bu seviyenin altına düşünce uyarı verir"
             />
@@ -450,7 +450,7 @@ export function HammaddeClient({ initialData }: HammaddeClientProps) {
               name="criticalLevel"
               type="number"
               min="0"
-              step="0.001"
+              step="0.0001"
               defaultValue={
                 selected?.criticalLevel
                   ? parseFloat(selected.criticalLevel.toString())
@@ -503,7 +503,7 @@ export function HammaddeClient({ initialData }: HammaddeClientProps) {
               name="newStock"
               type="number"
               min="0"
-              step="0.001"
+              step="0.0001"
               required
               defaultValue={selected ? parseFloat(selected.currentStock.toString()) : ""}
               className="form-input"

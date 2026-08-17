@@ -11,6 +11,7 @@ import { parseDecimalInput } from "@/lib/utils";
 export async function getRawMaterials() {
   await requireAuth();
   return prisma.rawMaterial.findMany({
+    where: { isDeleted: false },
     orderBy: { name: "asc" },
   });
 }
@@ -43,9 +44,12 @@ export async function createRawMaterial(formData: FormData) {
 
   const codeValue = code && code.trim() !== "" ? code.trim() : null;
 
+  let warningMessage: string | undefined;
   if (codeValue) {
-    const existingCode = await prisma.rawMaterial.findUnique({ where: { code: codeValue } });
-    if (existingCode) throw new Error(`"${codeValue}" koduna sahip bir hammadde zaten mevcut.`);
+    const existingCode = await prisma.rawMaterial.findFirst({ where: { code: codeValue } });
+    if (existingCode) {
+      warningMessage = `"${codeValue}" koduna sahip başka bir hammadde daha var, yine de kaydedildi.`;
+    }
   }
 
   const material = await prisma.rawMaterial.create({
@@ -72,7 +76,7 @@ export async function createRawMaterial(formData: FormData) {
 
   revalidatePath("/hammaddeler");
   revalidatePath("/");
-  return { success: true };
+  return { success: true, warning: warningMessage };
 }
 
 // ─────────────────────────────────────────────
@@ -102,11 +106,14 @@ export async function updateRawMaterial(id: string, formData: FormData) {
 
   const codeValue = code && code.trim() !== "" ? code.trim() : null;
 
+  let warningMessage: string | undefined;
   if (codeValue) {
     const existingCode = await prisma.rawMaterial.findFirst({
       where: { code: codeValue, NOT: { id } },
     });
-    if (existingCode) throw new Error(`"${codeValue}" koduna sahip başka bir hammadde zaten mevcut.`);
+    if (existingCode) {
+      warningMessage = `"${codeValue}" koduna sahip başka bir hammadde daha var, yine de güncellendi.`;
+    }
   }
 
   await prisma.rawMaterial.update({
@@ -116,7 +123,7 @@ export async function updateRawMaterial(id: string, formData: FormData) {
 
   revalidatePath("/hammaddeler");
   revalidatePath("/");
-  return { success: true };
+  return { success: true, warning: warningMessage };
 }
 
 // ─────────────────────────────────────────────
@@ -125,21 +132,27 @@ export async function updateRawMaterial(id: string, formData: FormData) {
 export async function deleteRawMaterial(id: string) {
   await requireAuth();
 
-  const recipeCount = await prisma.recipe.count({ where: { rawMaterialId: id } });
-  if (recipeCount > 0) {
-    throw new Error(
-      "Bu hammadde bir veya daha fazla ürün reçetesinde kullanılıyor. Önce reçetelerden kaldırın."
-    );
-  }
+  const rm = await prisma.rawMaterial.findUnique({ where: { id } });
+  if (!rm) throw new Error("Hammadde bulunamadı.");
 
-  const movementCount = await prisma.stockMovement.count({ where: { rawMaterialId: id } });
-  if (movementCount > 0) {
-    throw new Error(
-      "Bu hammaddenin stok hareketi geçmişi var, silinemez. Gerekirse pasife alma özelliği ekleyebiliriz."
-    );
-  }
+  // Soft delete raw material and log movement
+  await prisma.$transaction(async (tx) => {
+    // 1. Mark as deleted and zero out stock
+    await tx.rawMaterial.update({ 
+      where: { id },
+      data: { isDeleted: true, currentStock: 0 }
+    });
 
-  await prisma.rawMaterial.delete({ where: { id } });
+    // 2. Log movement if there was stock, or just log deletion
+    await tx.stockMovement.create({
+      data: {
+        rawMaterialId: id,
+        type: "DUZELTME",
+        amount: -Number(rm.currentStock),
+        description: `Sistem: Hammadde silindi (Pasife alındı). Mevcut stok (${rm.currentStock}) sıfırlandı.`,
+      }
+    });
+  });
   revalidatePath("/hammaddeler");
   revalidatePath("/");
   return { success: true };

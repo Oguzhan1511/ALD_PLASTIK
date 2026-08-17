@@ -3,6 +3,7 @@
 import { useState, useTransition, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Modal } from "@/components/ui/Modal";
+import { SearchableSelect } from "@/components/ui/SearchableSelect";
 import {
   createProduct,
   updateProduct,
@@ -13,13 +14,22 @@ import {
 import { RawMaterial } from "@prisma/client";
 import { Decimal } from "@prisma/client/runtime/library";
 
-interface RecipeWithMaterial {
+interface ProductBasic {
+  id: string;
+  name: string;
+  code: string | null;
+  unitWeight: Decimal | null;
+}
+
+interface RecipeItem {
   id: string;
   productId: string;
-  rawMaterialId: string;
+  rawMaterialId: string | null;
+  componentProductId: string | null;
   quantityPerUnit: Decimal;
   wastePercentage: Decimal;
-  rawMaterial: RawMaterial;
+  rawMaterial: RawMaterial | null;
+  componentProduct: ProductBasic | null;
 }
 
 interface ProductWithRecipes {
@@ -29,7 +39,7 @@ interface ProductWithRecipes {
   parentProduct: string | null;
   unitWeight: Decimal | null;
   createdAt: Date;
-  recipes: RecipeWithMaterial[];
+  recipes: RecipeItem[];
 }
 
 interface UrunClientProps {
@@ -48,7 +58,7 @@ export function UrunClient({ initialProducts, rawMaterials }: UrunClientProps) {
   const [success, setSuccess] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState<"name_asc" | "name_desc" | "recipe_desc" | "recipe_asc">("name_asc");
-  const [newRecipes, setNewRecipes] = useState<{rawMaterialId: string, quantityPerUnit: string, wastePercentage: string}[]>([]);
+  const [newRecipes, setNewRecipes] = useState<{type: "raw" | "product", rawMaterialId: string, componentProductId: string, quantityPerUnit: string, wastePercentage: string}[]>([]);
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
 
@@ -107,8 +117,7 @@ export function UrunClient({ initialProducts, rawMaterials }: UrunClientProps) {
   const handleCreate = async (formData: FormData) => {
     setError("");
     
-    // Geçerli reçete satırlarını filtrele ve formData'ya ekle
-    const validRecipes = newRecipes.filter(r => r.rawMaterialId && r.quantityPerUnit);
+    const validRecipes = newRecipes.filter(r => (r.rawMaterialId || r.componentProductId) && r.quantityPerUnit);
     if (validRecipes.length > 0) {
       formData.append("recipes", JSON.stringify(validRecipes));
     }
@@ -183,15 +192,21 @@ export function UrunClient({ initialProducts, rawMaterials }: UrunClientProps) {
     });
   };
 
-  const selectedRecipes = selected?.recipes || [];
-  const totalGram = selectedRecipes.reduce(
-    (sum, r) => sum + parseFloat(r.quantityPerUnit.toString()),
-    0
-  );
+  const [recipeAddType, setRecipeAddType] = useState<"raw" | "product">("raw");
 
-  // Reçetede olmayan hammaddeler
+  const selectedRecipes = selected?.recipes || [];
+  const totalsByUnitModal = selectedRecipes.reduce((acc, r) => {
+    const unit = r.rawMaterial?.unit || "birim";
+    const qty = parseFloat(r.quantityPerUnit.toString());
+    acc[unit] = (acc[unit] || 0) + qty;
+    return acc;
+  }, {} as Record<string, number>);
+
   const availableMaterials = rawMaterials.filter(
     (m) => !selectedRecipes.find((r) => r.rawMaterialId === m.id)
+  );
+  const availableSubProducts = products.filter(
+    (p) => p.id !== selected?.id && !selectedRecipes.find((r) => r.componentProductId === p.id)
   );
 
   return (
@@ -211,7 +226,7 @@ export function UrunClient({ initialProducts, rawMaterials }: UrunClientProps) {
         {success && <div className="alert-success mb-4">{success}</div>}
 
         {/* Stats */}
-        <div className="grid grid-cols-2 gap-4 mb-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
           <div className="stat-card">
             <div className="text-2xl font-bold text-slate-800">{products.length}</div>
             <div className="text-sm text-slate-500 mt-1">Toplam Ürün</div>
@@ -231,7 +246,7 @@ export function UrunClient({ initialProducts, rawMaterials }: UrunClientProps) {
             
             <div className="flex flex-1 w-full md:max-w-xl gap-3 items-center justify-end">
               {/* Arama kutusu */}
-              <div className="relative flex-1 max-w-xs">
+              <div className="relative flex-1 w-full sm:max-w-xs">
                 <svg className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                 </svg>
@@ -287,17 +302,20 @@ export function UrunClient({ initialProducts, rawMaterials }: UrunClientProps) {
                     <th>Ürün Adı</th>
                     <th>Ait Olduğu Mamül</th>
                     <th>Kod</th>
-                    <th>Reçete (Hammadde Sayısı)</th>
+                    <th>Reçete (Bileşen Sayısı)</th>
                     <th>Toplam Gramaj</th>
                     <th>İşlemler</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredProducts.map((p) => {
-                    const total = p.recipes.reduce(
-                      (sum, r) => sum + parseFloat(r.quantityPerUnit.toString()),
-                      0
-                    );
+                    const totalsByUnit = p.recipes.reduce((acc, r) => {
+                      const unit = r.rawMaterial?.unit || "birim";
+                      const qty = parseFloat(r.quantityPerUnit.toString());
+                      acc[unit] = (acc[unit] || 0) + qty;
+                      return acc;
+                    }, {} as Record<string, number>);
+
                     return (
                       <tr key={p.id}>
                         <td className="font-medium text-slate-800">{p.name}</td>
@@ -313,11 +331,19 @@ export function UrunClient({ initialProducts, rawMaterials }: UrunClientProps) {
                           {p.recipes.length === 0 ? (
                             <span className="badge-yellow">Reçete yok</span>
                           ) : (
-                            <span className="badge-blue">{p.recipes.length} hammadde</span>
+                            <span className="badge-blue">{p.recipes.length} bileşen</span>
                           )}
                         </td>
                         <td className="text-slate-600">
-                          {p.recipes.length > 0 ? `${total.toLocaleString("tr-TR", { maximumFractionDigits: 2 })} birim/adet` : "—"}
+                          {p.recipes.length > 0 ? (
+                            <div className="flex flex-col gap-0.5">
+                              {Object.entries(totalsByUnit).map(([unit, val]) => (
+                                <span key={unit}>{val.toLocaleString("tr-TR", { maximumFractionDigits: 5 })} {unit}</span>
+                              ))}
+                            </div>
+                          ) : (
+                            "—"
+                          )}
                         </td>
                         <td>
                           <div className="flex items-center gap-1.5">
@@ -392,13 +418,22 @@ export function UrunClient({ initialProducts, rawMaterials }: UrunClientProps) {
           <div className="border-t border-slate-200 pt-4">
             <div className="flex items-center justify-between mb-3">
               <label className="form-label mb-0 text-slate-700">Başlangıç Reçetesi (Opsiyonel)</label>
-              <button
-                type="button"
-                className="text-sm font-medium text-blue-600 hover:text-blue-800"
-                onClick={() => setNewRecipes([...newRecipes, { rawMaterialId: "", quantityPerUnit: "", wastePercentage: "" }])}
-              >
-                + Hammadde Ekle
-              </button>
+              <div className="flex bg-slate-100 p-1 rounded-lg">
+                <button
+                  type="button"
+                  className="px-3 py-1 text-xs font-medium rounded-md text-slate-600 hover:bg-white hover:shadow-sm transition-all"
+                  onClick={() => setNewRecipes([...newRecipes, { type: "raw", rawMaterialId: "", componentProductId: "", quantityPerUnit: "", wastePercentage: "" }])}
+                >
+                  + Hammadde
+                </button>
+                <button
+                  type="button"
+                  className="px-3 py-1 text-xs font-medium rounded-md text-slate-600 hover:bg-white hover:shadow-sm transition-all"
+                  onClick={() => setNewRecipes([...newRecipes, { type: "product", rawMaterialId: "", componentProductId: "", quantityPerUnit: "", wastePercentage: "" }])}
+                >
+                  + Alt Ürün
+                </button>
+              </div>
             </div>
             
             {newRecipes.length === 0 ? (
@@ -406,33 +441,39 @@ export function UrunClient({ initialProducts, rawMaterials }: UrunClientProps) {
             ) : (
               <div className="space-y-3">
                 {newRecipes.map((r, idx) => (
-                  <div key={idx} className="flex gap-2 items-end bg-slate-50 p-2 rounded-lg border border-slate-100">
-                    <div className="flex-1">
-                      <label className="form-label text-xs">Hammadde</label>
-                      <select 
+                  <div key={idx} className="flex flex-col sm:flex-row gap-2 sm:items-end bg-slate-50 p-2 sm:p-3 rounded-lg border border-slate-100">
+                    <div className="flex-1 w-full min-w-0">
+                      <label className="form-label text-xs">{r.type === "raw" ? "Hammadde" : "Alt Ürün"}</label>
+                      <SearchableSelect
                         required
-                        className="form-select text-sm py-1.5"
-                        value={r.rawMaterialId}
-                        onChange={(e) => {
+                        value={r.type === "raw" ? r.rawMaterialId : r.componentProductId}
+                        onChange={(val) => {
                           const arr = [...newRecipes];
-                          arr[idx].rawMaterialId = e.target.value;
+                          if (r.type === "raw") arr[idx].rawMaterialId = val;
+                          else arr[idx].componentProductId = val;
                           setNewRecipes(arr);
                         }}
-                      >
-                        <option value="">Seçin...</option>
-                        {rawMaterials.map(m => (
-                          <option key={m.id} value={m.id} disabled={newRecipes.some((nr, i) => i !== idx && nr.rawMaterialId === m.id)}>
-                            {m.name} {m.code ? `(${m.code})` : ""} ({m.unit})
-                          </option>
-                        ))}
-                      </select>
+                        options={r.type === "raw" ? (
+                          rawMaterials.map(m => ({
+                            id: m.id,
+                            name: `${m.name} ${m.code ? `(${m.code})` : ""} (${m.unit})`,
+                            disabled: newRecipes.some((nr, i) => i !== idx && nr.rawMaterialId === m.id)
+                          }))
+                        ) : (
+                          products.map(p => ({
+                            id: p.id,
+                            name: `${p.name} ${p.code ? `(${p.code})` : ""}`,
+                            disabled: newRecipes.some((nr, i) => i !== idx && nr.componentProductId === p.id)
+                          }))
+                        )}
+                      />
                     </div>
-                    <div className="w-28">
+                    <div className="w-full sm:w-28">
                       <label className="form-label text-xs">Miktar</label>
                       <input
                         type="number"
-                        min="0.001"
-                        step="0.001"
+                        min="0.0001"
+                        step="0.0001"
                         required
                         className="form-input text-sm py-1.5"
                         placeholder="0"
@@ -444,15 +485,15 @@ export function UrunClient({ initialProducts, rawMaterials }: UrunClientProps) {
                         }}
                       />
                     </div>
-                    <div className="w-24">
-                      <label className="form-label text-xs">Fire %</label>
+                    <div className="w-full sm:w-24">
+                      <label className="form-label text-xs">Fire % <span className="text-slate-400 font-normal">(0–100)</span></label>
                       <input
                         type="number"
                         min="0"
                         max="100"
                         step="0.1"
                         className="form-input text-sm py-1.5"
-                        placeholder="0"
+                        placeholder="örn: 3"
                         value={r.wastePercentage}
                         onChange={(e) => {
                           const arr = [...newRecipes];
@@ -463,7 +504,7 @@ export function UrunClient({ initialProducts, rawMaterials }: UrunClientProps) {
                     </div>
                     <button
                       type="button"
-                      className="btn btn-danger btn-sm mb-[1px] px-2"
+                      className="btn btn-danger w-full sm:w-auto btn-sm mb-0 sm:mb-[1px] px-2 py-2 sm:py-1.5 mt-2 sm:mt-0 justify-center"
                       onClick={() => setNewRecipes(newRecipes.filter((_, i) => i !== idx))}
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
@@ -556,7 +597,12 @@ export function UrunClient({ initialProducts, rawMaterials }: UrunClientProps) {
           {selectedRecipes.length > 0 && (
             <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-2.5 text-sm text-blue-700">
               <strong>Toplam:</strong>{" "}
-              {totalGram.toLocaleString("tr-TR", { maximumFractionDigits: 3 })} birim / adet
+              {Object.entries(totalsByUnitModal).map(([unit, val], i, arr) => (
+                <span key={unit}>
+                  {val.toLocaleString("tr-TR", { maximumFractionDigits: 5 })} {unit}
+                  {i < arr.length - 1 ? " + " : ""}
+                </span>
+              ))}
             </div>
           )}
 
@@ -570,9 +616,10 @@ export function UrunClient({ initialProducts, rawMaterials }: UrunClientProps) {
               <table className="data-table">
                 <thead>
                   <tr>
-                    <th>Hammadde</th>
+                    <th>Bileşen (Hammadde / Ürün)</th>
                     <th>Miktar/Adet</th>
                     <th>Fire Oranı</th>
+                    <th>Tür</th>
                     <th></th>
                   </tr>
                 </thead>
@@ -582,11 +629,17 @@ export function UrunClient({ initialProducts, rawMaterials }: UrunClientProps) {
                     return (
                       <tr key={r.id}>
                         <td className="font-medium text-slate-800">
-                          {r.rawMaterial.name}
-                          {r.rawMaterial.code && <span className="text-slate-400 text-sm ml-1 font-mono">({r.rawMaterial.code})</span>}
+                          {r.rawMaterialId 
+                            ? (r.rawMaterial?.name || "Bilinmeyen Hammadde")
+                            : (r.componentProduct?.name || "Bilinmeyen Ürün")}
+                          {(r.rawMaterial?.code || r.componentProduct?.code) && (
+                            <span className="text-slate-400 text-sm ml-1 font-mono">
+                              ({r.rawMaterial?.code || r.componentProduct?.code})
+                            </span>
+                          )}
                         </td>
                         <td>
-                          {parseFloat(r.quantityPerUnit.toString()).toLocaleString("tr-TR", { maximumFractionDigits: 3 })} {r.rawMaterial.unit}
+                          {parseFloat(r.quantityPerUnit.toString()).toLocaleString("tr-TR", { maximumFractionDigits: 5 })} {r.rawMaterial?.unit || "adet"}
                         </td>
                         <td>
                           {wastePercent > 0 ? (
@@ -595,6 +648,13 @@ export function UrunClient({ initialProducts, rawMaterials }: UrunClientProps) {
                             </span>
                           ) : (
                             <span className="text-slate-300 text-xs">—</span>
+                          )}
+                        </td>
+                        <td>
+                          {r.rawMaterialId ? (
+                            <span className="badge-blue text-xs">Hammadde</span>
+                          ) : (
+                            <span className="badge-purple text-xs bg-purple-50 text-purple-700 border-purple-200 border">Alt Ürün</span>
                           )}
                         </td>
                         <td>
@@ -616,43 +676,73 @@ export function UrunClient({ initialProducts, rawMaterials }: UrunClientProps) {
 
           {/* Yeni satır ekleme formu */}
           <div className="border-t border-slate-200 pt-4">
-            <p className="text-sm font-semibold text-slate-700 mb-3">Hammadde Ekle</p>
-            {rawMaterials.length === 0 ? (
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-sm font-semibold text-slate-700">Reçeteye Bileşen Ekle</p>
+              <div className="flex bg-slate-100 p-1 rounded-lg">
+                <button 
+                  type="button" 
+                  onClick={() => setRecipeAddType("raw")}
+                  className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${recipeAddType === "raw" ? "bg-white shadow-sm text-slate-800" : "text-slate-500 hover:text-slate-700"}`}
+                >
+                  Hammadde
+                </button>
+                <button 
+                  type="button" 
+                  onClick={() => setRecipeAddType("product")}
+                  className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${recipeAddType === "product" ? "bg-white shadow-sm text-slate-800" : "text-slate-500 hover:text-slate-700"}`}
+                >
+                  Alt Ürün
+                </button>
+              </div>
+            </div>
+
+            {recipeAddType === "raw" && rawMaterials.length === 0 ? (
               <div className="alert-warning text-sm">
                 Önce /hammaddeler sayfasından hammadde tanımlayın.
               </div>
-            ) : availableMaterials.length === 0 ? (
+            ) : recipeAddType === "raw" && availableMaterials.length === 0 ? (
               <div className="alert-info text-sm">
                 Tüm hammaddeler zaten bu reçetede mevcut.
               </div>
+            ) : recipeAddType === "product" && availableSubProducts.length === 0 ? (
+              <div className="alert-info text-sm">
+                Eklenebilecek başka alt ürün kalmadı.
+              </div>
             ) : (
               <form action={handleAddRecipe} className="space-y-3">
-                <div className="flex gap-2 items-end">
-                  <div className="flex-1">
-                    <label className="form-label text-xs">Hammadde</label>
-                    <select name="rawMaterialId" required className="form-select">
-                      <option value="">Seçin...</option>
-                      {availableMaterials.map((m) => (
-                        <option key={m.id} value={m.id}>
-                          {m.name} {m.code ? `(${m.code})` : ""} ({m.unit})
-                        </option>
-                      ))}
-                    </select>
+                <div className="flex flex-col sm:flex-row gap-2 sm:items-end">
+                  <div className="flex-1 w-full min-w-0">
+                    <label className="form-label text-xs">{recipeAddType === "raw" ? "Hammadde Seçin" : "Alt Ürün Seçin"}</label>
+                    <SearchableSelect
+                      name={recipeAddType === "raw" ? "rawMaterialId" : "componentProductId"}
+                      required
+                      options={recipeAddType === "raw" ? (
+                        availableMaterials.map((m) => ({
+                          id: m.id,
+                          name: `${m.name} ${m.code ? `(${m.code})` : ""} (${m.unit})`
+                        }))
+                      ) : (
+                        availableSubProducts.map((p) => ({
+                          id: p.id,
+                          name: `${p.name} ${p.code ? `(${p.code})` : ""}`
+                        }))
+                      )}
+                    />
                   </div>
-                  <div className="w-32">
+                  <div className="w-full sm:w-32">
                     <label className="form-label text-xs">Miktar/Adet</label>
                     <input
                       name="quantityPerUnit"
                       type="number"
-                      min="0.001"
-                      step="0.001"
+                      min="0.0001"
+                      step="0.0001"
                       required
                       className="form-input"
                       placeholder="0"
                     />
                   </div>
-                  <div className="w-28">
-                    <label className="form-label text-xs">Fire Oranı</label>
+                  <div className="w-full sm:w-28">
+                    <label className="form-label text-xs">Fire Oranı <span className="text-slate-400 font-normal">(0–100)</span></label>
                     <div className="relative">
                       <input
                         name="wastePercentage"
@@ -661,14 +751,14 @@ export function UrunClient({ initialProducts, rawMaterials }: UrunClientProps) {
                         max="100"
                         step="0.1"
                         className="form-input pr-7"
-                        placeholder="0"
+                        placeholder="örn: 3"
                       />
                       <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm font-medium pointer-events-none">%</span>
                     </div>
                   </div>
                   <button
                     type="submit"
-                    className="btn btn-primary flex-shrink-0"
+                    className="btn btn-primary w-full sm:w-auto flex-shrink-0 justify-center mt-2 sm:mt-0 py-2 sm:py-1.5"
                     disabled={isPending}
                   >
                     Ekle
