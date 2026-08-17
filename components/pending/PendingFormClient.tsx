@@ -169,7 +169,7 @@ export function PendingFormClient({ type, products, rawMaterials = [], title, re
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex flex-col items-center justify-center p-4">
       <div className="flex justify-center mb-3">
         <img src="/ald-logo.png" alt="ALD Plastik" className="h-10 w-auto object-contain" />
       </div>
@@ -206,13 +206,13 @@ export function PendingFormClient({ type, products, rawMaterials = [], title, re
           <form onSubmit={handleSubmit} className="space-y-6">
             
             <div>
-              <label className="block text-lg font-semibold text-slate-700 mb-2">
+              <label className="block text-lg font-semibold text-slate-700 dark:text-slate-200 mb-2">
                 {type === "SEVKIYAT" ? "Ürün veya Hammadde Seçin" : "Ürün Seçin"}
               </label>
               <div className="relative">
                 <input
                   type="text"
-                  className="w-full p-4 text-lg border-2 border-slate-300 rounded-xl focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition-all outline-none"
+                  className="w-full p-4 text-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white border-2 border-slate-300 dark:border-slate-600 rounded-xl focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition-all outline-none"
                   placeholder={type === "SEVKIYAT" ? "Ad veya kod ile arayın..." : "Ürün adı veya kod..."}
                   value={itemSearch}
                   onChange={(e) => {
@@ -225,7 +225,7 @@ export function PendingFormClient({ type, products, rawMaterials = [], title, re
                   autoComplete="off"
                 />
                 {showItemDropdown && itemSearch.trim() !== "" && (
-                  <div className="absolute z-20 w-full mt-2 bg-white border-2 border-slate-200 rounded-xl shadow-2xl max-h-60 overflow-y-auto">
+                  <div className="absolute z-20 w-full mt-2 bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-xl shadow-2xl max-h-60 overflow-y-auto">
                     {filteredItems.length === 0 ? (
                       <div className="p-4 text-slate-500 text-center">Eşleşen kayıt bulunamadı.</div>
                     ) : (
@@ -233,7 +233,7 @@ export function PendingFormClient({ type, products, rawMaterials = [], title, re
                         <button
                           key={p.id}
                           type="button"
-                          className="w-full text-left p-4 hover:bg-slate-50 border-b border-slate-100 last:border-0 transition-colors"
+                          className="w-full text-left p-4 hover:bg-slate-50 dark:hover:bg-slate-700 border-b border-slate-100 dark:border-slate-700 last:border-0 transition-colors"
                           onMouseDown={() => handleSelectItem(p)}
                         >
                           <div className="flex items-center gap-2 mb-1">
@@ -242,9 +242,9 @@ export function PendingFormClient({ type, products, rawMaterials = [], title, re
                                 {p._type === "PRODUCT" ? "ÜRÜN" : "HAMMADDE"}
                               </span>
                             )}
-                            <div className="font-semibold text-lg text-slate-800">{p.name}</div>
+                            <div className="font-semibold text-lg text-slate-800 dark:text-slate-100">{p.name}</div>
                           </div>
-                          {p.code && <div className="text-sm font-mono text-slate-500">{p.code}</div>}
+                          {p.code && <div className="text-sm font-mono text-slate-500 dark:text-slate-400">{p.code}</div>}
                         </button>
                       ))
                     )}
@@ -252,7 +252,7 @@ export function PendingFormClient({ type, products, rawMaterials = [], title, re
                 )}
               </div>
               {selectedItemId && (
-                <div className={`mt-2 p-3 rounded-lg text-sm font-medium flex items-center gap-2 ${type === "SEVKIYAT" ? (direction === "GIRIS" ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700") : "bg-blue-50 text-blue-700"}`}>
+                <div className={`mt-2 p-3 rounded-lg text-sm font-medium flex items-center gap-2 ${type === "SEVKIYAT" ? (direction === "GIRIS" ? "bg-green-50 dark:bg-green-900/40 text-green-700 dark:text-green-300" : "bg-red-50 dark:bg-red-900/40 text-red-700 dark:text-red-300") : "bg-blue-50 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300"}`}>
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
                   Seçili: {selectedItem?.name} 
                   {type === "SEVKIYAT" && (
@@ -263,7 +263,7 @@ export function PendingFormClient({ type, products, rawMaterials = [], title, re
             </div>
 
             <div>
-              <label className="block text-lg font-semibold text-slate-700 mb-2">
+              <label className="block text-lg font-semibold text-slate-700 dark:text-slate-200 mb-2">
                 Miktar ({selectedItem?.unit || 'Adet'})
               </label>
               <input
@@ -273,7 +273,7 @@ export function PendingFormClient({ type, products, rawMaterials = [], title, re
                 required
                 value={quantity}
                 onChange={(e) => setQuantity(e.target.value)}
-                className="w-full p-4 text-2xl font-bold text-center border-2 border-slate-300 rounded-xl focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition-all outline-none"
+                className="w-full p-4 text-2xl font-bold text-center bg-white dark:bg-slate-800 text-slate-900 dark:text-white border-2 border-slate-300 dark:border-slate-600 rounded-xl focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition-all outline-none"
                 placeholder="0"
               />
               {selectedItem?._type === "PRODUCT" && (
@@ -282,13 +282,13 @@ export function PendingFormClient({ type, products, rawMaterials = [], title, re
             </div>
 
             <div>
-              <label className="block text-lg font-semibold text-slate-700 mb-2">Adınız Soyadınız</label>
+              <label className="block text-lg font-semibold text-slate-700 dark:text-slate-200 mb-2">Adınız Soyadınız</label>
               <input
                 type="text"
                 required
                 value={submittedByName}
                 onChange={(e) => setSubmittedByName(e.target.value)}
-                className="w-full p-4 text-lg border-2 border-slate-300 rounded-xl focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition-all outline-none"
+                className="w-full p-4 text-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white border-2 border-slate-300 dark:border-slate-600 rounded-xl focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition-all outline-none"
                 placeholder="Adınızı yazın..."
               />
             </div>
