@@ -2,12 +2,11 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getToken } from "next-auth/jwt";
 
-export async function proxy(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Giriş sayfası ve API auth rotaları ile usta formları hariç her şeyi koru
+  // API auth rotaları ile usta formları hariç her şeyi koru
   const isPublicPath =
-    pathname === "/login" ||
     pathname.startsWith("/api/auth") ||
     pathname.startsWith("/u/");
 
@@ -19,8 +18,8 @@ export async function proxy(request: NextRequest) {
   });
 
   if (!token) {
-    const loginUrl = new URL("/login", request.url);
-    loginUrl.searchParams.set("callbackUrl", pathname);
+    const loginUrl = new URL("https://ogzsystem.com/admin/login");
+    loginUrl.searchParams.set("callbackUrl", `https://ald.ogzsystem.com${pathname}`);
     return NextResponse.redirect(loginUrl);
   }
 
