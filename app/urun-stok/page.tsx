@@ -7,6 +7,8 @@ export const metadata: Metadata = {
   description: "Ürün bazlı stok durumu, çıkış ve giriş kayıtları.",
 };
 
+export const dynamic = 'force-dynamic';
+
 export default async function UrunStokPage() {
   const products = await getProductsWithStock();
 

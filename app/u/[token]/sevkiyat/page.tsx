@@ -9,6 +9,8 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
+export const dynamic = 'force-dynamic';
+
 export default async function UstaSevkiyatPage({ params }: { params: Promise<{ token: string }> }) {
   const resolvedParams = await params;
   if (resolvedParams.token !== process.env.USTA_SEVKIYAT_TOKEN) {

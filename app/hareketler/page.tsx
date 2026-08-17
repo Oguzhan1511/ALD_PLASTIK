@@ -10,6 +10,8 @@ export const metadata: Metadata = {
   description: "Tüm stok giriş-çıkış hareketlerinin tarih sıralı, filtrelenebilir dökümü.",
 };
 
+export const dynamic = 'force-dynamic';
+
 export default async function HareketiPage() {
   const [
     { movements: hammaddeMovements, total: hTotal, totalPages: hTotalPages },

@@ -7,6 +7,8 @@ export const metadata: Metadata = {
   description: "Usta üretim ve sevkiyat bildirim onayları",
 };
 
+export const dynamic = 'force-dynamic';
+
 export default async function RaporlarPage() {
   const pendingEntries = await getPendingEntries("BEKLIYOR");
   const approvedEntries = await getPendingEntries("ONAYLANDI");

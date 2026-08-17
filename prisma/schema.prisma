@@ -29,6 +29,7 @@ model RawMaterial {
   recipes        Recipe[]
   stockMovements StockMovement[]
   pendingEntries PendingEntry[]
+  jobSchedules   JobSchedule[]
 
   @@map("raw_materials")
 }
@@ -57,6 +58,7 @@ model Product {
   shipmentGroupItems    ShipmentGroupItem[]
   shipmentRecords       ShipmentRecord[]
   pendingEntries        PendingEntry[]
+  jobSchedules          JobSchedule[]
 
   @@map("products")
 }
@@ -220,4 +222,44 @@ model PendingEntry {
   shipmentRecord   ShipmentRecord?   @relation(fields: [shipmentRecordId], references: [id], onDelete: SetNull)
 
   @@map("pending_entries")
+}
+
+// ─────────────────────────────────────────────
+// Makine (Machine)
+// ─────────────────────────────────────────────
+model Machine {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  isActive    Boolean  @default(true)
+  
+  jobSchedules JobSchedule[]
+  
+  @@map("machines")
+}
+
+// ─────────────────────────────────────────────
+// İş Planı (Job Schedule)
+// ─────────────────────────────────────────────
+model JobSchedule {
+  id             String   @id @default(cuid())
+  machineId      String
+  productId      String
+  rawMaterialId  String?
+  
+  startTime      DateTime
+  endTime        DateTime
+  expectedQty    Decimal? // Hedeflenen Üretim Miktarı
+  
+  status         String   @default("PLANLANDI") // PLANLANDI, DEVAM_EDIYOR, TAMAMLANDI, IPTAL
+  notes          String?
+  
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  machine        Machine       @relation(fields: [machineId], references: [id], onDelete: Restrict)
+  product        Product       @relation(fields: [productId], references: [id], onDelete: Restrict)
+  rawMaterial    RawMaterial?  @relation(fields: [rawMaterialId], references: [id], onDelete: SetNull)
+
+  @@map("job_schedules")
 }

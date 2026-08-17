@@ -7,6 +7,8 @@ export const metadata: Metadata = {
   description: "Hammadde stok takibi, giriş-çıkış işlemleri ve kritik seviye yönetimi.",
 };
 
+export const dynamic = 'force-dynamic';
+
 export default async function HammaddelerPage() {
   const materials = await getRawMaterials();
 

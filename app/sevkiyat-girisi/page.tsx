@@ -9,6 +9,8 @@ export const metadata: Metadata = {
   description: "Dışarıdan gelen iadeler ve mamül girişleri.",
 };
 
+export const dynamic = 'force-dynamic';
+
 export default async function SevkiyatGirisiPage() {
   const [rawMaterials, products, recentEntries] = await Promise.all([
     getRawMaterials(),

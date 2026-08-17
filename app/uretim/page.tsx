@@ -8,6 +8,8 @@ export const metadata: Metadata = {
   description: "Üretim kaydı girin, stok otomatik düşülür.",
 };
 
+export const dynamic = 'force-dynamic';
+
 export default async function UretimPage() {
   const [products, recentProductions] = await Promise.all([
     getProducts(),

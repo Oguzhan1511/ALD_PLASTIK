@@ -8,6 +8,8 @@ export const metadata: Metadata = {
   description: "Ürün tanımlama ve reçete (BOM) yönetimi.",
 };
 
+export const dynamic = 'force-dynamic';
+
 export default async function UrunlerPage() {
   const [products, rawMaterials] = await Promise.all([
     getProducts(),

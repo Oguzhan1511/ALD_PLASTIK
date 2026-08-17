@@ -7,6 +7,8 @@ export const metadata: Metadata = {
   description: "Hammadde ve üretim stok takip sistemine genel bakış.",
 };
 
+export const dynamic = 'force-dynamic';
+
 async function getDashboardData() {
   const now = new Date();
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);

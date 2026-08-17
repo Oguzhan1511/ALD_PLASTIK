@@ -7,6 +7,8 @@ export const metadata: Metadata = {
   description: "Ürün ve grup sevkiyatı yapın.",
 };
 
+export const dynamic = 'force-dynamic';
+
 export default async function SevkiyatPage() {
   const products = await getProducts();
   const serializedProducts = JSON.parse(JSON.stringify(products));
