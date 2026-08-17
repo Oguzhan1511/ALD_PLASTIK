@@ -58,7 +58,11 @@ export const authOptions: AuthOptions = {
         return url;
       }
       if (url.startsWith("/")) return `${baseUrl}${url}`;
-      else if (new URL(url).origin === baseUrl) return url;
+      try {
+        if (new URL(url).origin === baseUrl) return url;
+      } catch (error) {
+        return baseUrl;
+      }
       return baseUrl;
     },
     async jwt({ token, user }) {

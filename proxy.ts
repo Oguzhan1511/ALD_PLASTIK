@@ -12,20 +12,14 @@ export async function proxy(request: NextRequest) {
 
   if (isPublicPath) return NextResponse.next();
 
-  const isProduction = process.env.NODE_ENV === "production";
-  const cookieName = isProduction ? "__Secure-next-auth.session-token" : "next-auth.session-token";
-
   const token = await getToken({
     req: request,
     secret: process.env.NEXTAUTH_SECRET,
-    cookieName: cookieName,
   });
 
   if (!token) {
     const loginUrl = new URL("https://ogzsystem.com/admin/login");
-    const hasCookie = request.cookies.has(cookieName);
     loginUrl.searchParams.set("callbackUrl", `https://ald.ogzsystem.com${pathname}`);
-    loginUrl.searchParams.set("debug_hasCookie", String(hasCookie));
     return NextResponse.redirect(loginUrl);
   }
 
