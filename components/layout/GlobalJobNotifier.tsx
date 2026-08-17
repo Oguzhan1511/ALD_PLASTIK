@@ -1,11 +1,13 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { getJobSchedules, updateJobSchedule } from "@/lib/actions/is-takibi";
+import { getJobSchedules, updateJobSchedule, completeJobSchedule } from "@/lib/actions/is-takibi";
 
 export function GlobalJobNotifier() {
   const [activeNotification, setActiveNotification] = useState<{ job: any; type: 'START' | 'END' } | null>(null);
   const [dismissedNotifications, setDismissedNotifications] = useState<Set<string>>(new Set());
+  const [actualQty, setActualQty] = useState<string>("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -33,6 +35,7 @@ export function GlobalJobNotifier() {
 
           if (job.status === "DEVAM_EDIYOR" && now >= endTime) {
             setActiveNotification({ job, type: 'END' });
+            setActualQty(job.expectedQty ? String(job.expectedQty) : "");
             return;
           }
         }
@@ -53,17 +56,34 @@ export function GlobalJobNotifier() {
     if (!activeNotification) return;
     const { job, type } = activeNotification;
     
-    setActiveNotification(null);
-    setDismissedNotifications(prev => new Set(prev).add(job.id));
+    if (!accept) {
+      setActiveNotification(null);
+      setDismissedNotifications(prev => new Set(prev).add(job.id));
+      return;
+    }
     
-    if (accept) {
-      const newStatus = type === 'START' ? "DEVAM_EDIYOR" : "TAMAMLANDI";
-      try {
-        await updateJobSchedule(job.id, { status: newStatus });
-        window.dispatchEvent(new Event("job-schedule-updated"));
-      } catch(e) {
-        console.error(e);
+    setIsSubmitting(true);
+    try {
+      if (type === 'START') {
+        await updateJobSchedule(job.id, { status: "DEVAM_EDIYOR" });
+      } else {
+        const qty = Number(actualQty);
+        if (isNaN(qty) || qty <= 0) {
+          alert("Lütfen geçerli bir üretim miktarı girin.");
+          setIsSubmitting(false);
+          return;
+        }
+        await completeJobSchedule(job.id, qty);
       }
+      
+      setActiveNotification(null);
+      setDismissedNotifications(prev => new Set(prev).add(job.id));
+      window.dispatchEvent(new Event("job-schedule-updated"));
+    } catch(e: any) {
+      console.error(e);
+      alert(e.message || "İşlem sırasında bir hata oluştu.");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -94,21 +114,42 @@ export function GlobalJobNotifier() {
               <strong className="text-gray-800 dark:text-slate-100"> {activeNotification.job.product?.name}</strong> üretiminin 
               {activeNotification.type === 'START' ? ' başlama' : ' bitiş'} zamanı geldi.
             </p>
-            <p className="mt-2 text-sm text-gray-600 dark:text-slate-400 font-medium">
-              Durumu <span className="text-blue-600 dark:text-blue-400">'{activeNotification.type === 'START' ? 'Devam Ediyor' : 'Tamamlandı'}'</span> olarak güncelleyelim mi?
-            </p>
+            
+            {activeNotification.type === 'END' ? (
+              <div className="mt-3 bg-gray-50 dark:bg-slate-700/50 p-3 rounded-md">
+                <label className="block text-xs font-semibold text-gray-700 dark:text-slate-200 mb-1">
+                  Gerçekleşen Üretim Miktarı (Adet):
+                </label>
+                <input 
+                  type="number"
+                  value={actualQty}
+                  onChange={e => setActualQty(e.target.value)}
+                  className="w-full border border-gray-300 dark:border-slate-600 rounded-md px-3 py-1.5 text-sm dark:bg-slate-800 dark:text-white focus:ring-2 focus:ring-blue-500"
+                  min="1"
+                />
+                <p className="text-xs text-gray-500 dark:text-slate-400 mt-1">
+                  Onaylandığında otomatik olarak üretim stoklarına eklenecektir.
+                </p>
+              </div>
+            ) : (
+              <p className="mt-2 text-sm text-gray-600 dark:text-slate-400 font-medium">
+                Durumu <span className="text-blue-600 dark:text-blue-400">'Devam Ediyor'</span> olarak güncelleyelim mi?
+              </p>
+            )}
           </div>
         </div>
         <div className="mt-4 flex gap-3">
           <button
             onClick={() => handleNotificationAction(true)}
-            className="flex-1 bg-blue-600 text-white px-3 py-1.5 rounded-md text-sm font-medium hover:bg-blue-700 transition-colors"
+            disabled={isSubmitting}
+            className="flex-1 bg-blue-600 text-white px-3 py-1.5 rounded-md text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-70"
           >
-            Evet, Güncelle
+            {isSubmitting ? "Bekleyin..." : "Evet, Güncelle"}
           </button>
           <button
             onClick={() => handleNotificationAction(false)}
-            className="flex-1 bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-slate-200 px-3 py-1.5 rounded-md text-sm font-medium hover:bg-gray-200 dark:hover:bg-slate-600 transition-colors"
+            disabled={isSubmitting}
+            className="flex-1 bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-slate-200 px-3 py-1.5 rounded-md text-sm font-medium hover:bg-gray-200 dark:hover:bg-slate-600 transition-colors disabled:opacity-70"
           >
             Hayır, Kapat
           </button>

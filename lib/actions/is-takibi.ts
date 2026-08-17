@@ -166,6 +166,51 @@ export async function updateJobSchedule(id: string, data: {
 }
 
 // ─────────────────────────────────────────────
+// İş Planını Tamamla ve Üretime İşle
+// ─────────────────────────────────────────────
+export async function completeJobSchedule(id: string, actualQty: number) {
+  const { executeProduction } = await import("./uretim");
+  
+  const job = await prisma.jobSchedule.findUnique({ where: { id }, include: { machine: true } });
+  if (!job) throw new Error("İş planı bulunamadı.");
+  if (job.status === "TAMAMLANDI") throw new Error("Bu iş planı zaten tamamlanmış.");
+
+  // 1. İş planını tamamlandı olarak işaretle
+  const updated = await prisma.jobSchedule.update({
+    where: { id },
+    data: {
+      status: "TAMAMLANDI",
+      // İsteğe bağlı: gerçekleşen miktarı notlara ekleyebiliriz
+      notes: job.notes ? `${job.notes}\n(Gerçekleşen Üretim: ${actualQty})` : `Gerçekleşen Üretim: ${actualQty}`,
+    },
+  });
+
+  // 2. Sisteme üretim olarak gir
+  try {
+    await executeProduction(
+      job.productId,
+      actualQty,
+      new Date(),
+      `İş Takibi (Oto Üretim) - ${job.machine?.name}`
+    );
+  } catch (err: any) {
+    // Üretim eklerken hata olursa iş planını geri alalım ki kullanıcı tekrar deneyebilsin (örneğin stok yetersizse)
+    await prisma.jobSchedule.update({
+      where: { id },
+      data: { status: job.status, notes: job.notes },
+    });
+    throw new Error(`Üretim kaydedilemedi: ${err.message}`);
+  }
+
+  revalidatePath("/is-takibi");
+  revalidatePath("/uretim");
+  revalidatePath("/hammaddeler");
+  revalidatePath("/urunler");
+  revalidatePath("/hareketler");
+  return updated;
+}
+
+// ─────────────────────────────────────────────
 // İş Planı Sil
 // ─────────────────────────────────────────────
 export async function deleteJobSchedule(id: string) {
