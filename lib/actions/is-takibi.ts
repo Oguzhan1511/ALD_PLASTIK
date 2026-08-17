@@ -2,6 +2,7 @@
 
 import { prisma } from "../prisma";
 import { revalidatePath } from "next/cache";
+import { executeProduction } from "./uretim";
 
 // ─────────────────────────────────────────────
 // Makineleri Getir (ve yoksa 11 tane oluştur)
@@ -169,7 +170,6 @@ export async function updateJobSchedule(id: string, data: {
 // İş Planını Tamamla ve Üretime İşle
 // ─────────────────────────────────────────────
 export async function completeJobSchedule(id: string, actualQty: number) {
-  const { executeProduction } = await import("./uretim");
   
   const job = await prisma.jobSchedule.findUnique({ where: { id }, include: { machine: true } });
   if (!job) throw new Error("İş planı bulunamadı.");

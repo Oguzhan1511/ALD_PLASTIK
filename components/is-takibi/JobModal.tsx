@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { createJobSchedule, updateJobSchedule } from "@/lib/actions/is-takibi";
+import { createJobSchedule, updateJobSchedule, completeJobSchedule } from "@/lib/actions/is-takibi";
 
 export default function JobModal({ machine, date, job, products, rawMaterials, onClose, onRefresh }: any) {
   const isEdit = !!job;
@@ -135,7 +135,6 @@ export default function JobModal({ machine, date, job, products, rawMaterials, o
             setIsLoading(false);
             return;
           }
-          const { completeJobSchedule } = await import("@/lib/actions/is-takibi");
           await completeJobSchedule(job.id, qty);
         } else {
           await updateJobSchedule(job.id, payload);
