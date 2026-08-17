@@ -40,12 +40,9 @@ export async function getMachines() {
 // Belirli bir tarihteki tüm iş planlarını getir
 // ─────────────────────────────────────────────
 export async function getJobSchedules(dateStr: string) {
-  // Gelen tarih (YYYY-MM-DD) için günün başlangıcı ve sonu
-  const startOfDay = new Date(dateStr);
-  startOfDay.setHours(0, 0, 0, 0);
-
-  const endOfDay = new Date(dateStr);
-  endOfDay.setHours(23, 59, 59, 999);
+  // Türkiye saati ile (UTC+3) gelen tarihin başlangıcı ve bitişi
+  const startOfDay = new Date(`${dateStr}T00:00:00+03:00`);
+  const endOfDay = new Date(`${dateStr}T23:59:59+03:00`);
 
   const schedules = await prisma.jobSchedule.findMany({
     where: {
@@ -112,8 +109,8 @@ export async function getProductsAndRawMaterials() {
 // Belirli Bir Tarih Aralığındaki İş Planlarını Getir (Ustalar İçin)
 // ─────────────────────────────────────────────
 export async function getWeeklyJobSchedules(startDateStr: string, endDateStr: string) {
-  const start = new Date(`${startDateStr}T00:00:00`);
-  const end = new Date(`${endDateStr}T23:59:59`);
+  const start = new Date(`${startDateStr}T00:00:00+03:00`);
+  const end = new Date(`${endDateStr}T23:59:59+03:00`);
 
   return prisma.jobSchedule.findMany({
     where: {

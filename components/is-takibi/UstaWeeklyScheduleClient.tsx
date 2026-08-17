@@ -32,7 +32,10 @@ export function UstaWeeklyScheduleClient({ initialStartDate, initialEndDate, ini
   // İşleri tarihe göre grupla
   const groupedByDate: Record<string, any[]> = {};
   activeSchedules.forEach((schedule: any) => {
-    const dateKey = new Date(schedule.startTime).toISOString().split('T')[0];
+    // API'den gelen ISO string'i (UTC) yerel saate çevir
+    const d = new Date(schedule.startTime);
+    const dateKey = new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().split('T')[0];
+    
     if (!groupedByDate[dateKey]) {
       groupedByDate[dateKey] = [];
     }
@@ -71,8 +74,10 @@ export function UstaWeeklyScheduleClient({ initialStartDate, initialEndDate, ini
           <div className="space-y-8">
             {sortedDates.map((dateStr) => {
               const daySchedules = groupedByDate[dateStr];
-              const dateObj = new Date(dateStr);
-              const isToday = new Date().toISOString().split('T')[0] === dateStr;
+              
+              const now = new Date();
+              const todayLocal = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().split('T')[0];
+              const isToday = todayLocal === dateStr;
 
               return (
                 <section key={dateStr} className="relative">
