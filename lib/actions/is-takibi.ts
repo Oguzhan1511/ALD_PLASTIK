@@ -3,6 +3,7 @@
 import { prisma } from "../prisma";
 import { revalidatePath } from "next/cache";
 import { executeProduction } from "./uretim";
+import { requireAuth } from "../auth-guard";
 
 // ─────────────────────────────────────────────
 // Makineleri Getir (ve yoksa 11 tane oluştur)
@@ -108,7 +109,38 @@ export async function getProductsAndRawMaterials() {
 }
 
 // ─────────────────────────────────────────────
-// Yeni İş Planı Ekle
+// Belirli Bir Tarih Aralığındaki İş Planlarını Getir (Ustalar İçin)
+// ─────────────────────────────────────────────
+export async function getWeeklyJobSchedules(startDateStr: string, endDateStr: string) {
+  const start = new Date(`${startDateStr}T00:00:00`);
+  const end = new Date(`${endDateStr}T23:59:59`);
+
+  return prisma.jobSchedule.findMany({
+    where: {
+      startTime: { gte: start, lte: end },
+    },
+    include: {
+      machine: true,
+      product: true,
+      rawMaterial: true,
+    },
+    orderBy: [
+      { machine: { name: 'asc' } },
+      { startTime: 'asc' }
+    ],
+  });
+}
+
+// ─────────────────────────────────────────────
+// Usta İş Takip Linki İçin Token Getir
+// ─────────────────────────────────────────────
+export async function getUstaIsTakibiToken() {
+  await requireAuth();
+  return process.env.USTA_IS_TAKIBI_TOKEN || "8c92a15f0b4d458693c12ab7d8e9f2a411";
+}
+
+// ─────────────────────────────────────────────
+// İş Planı Ekle
 // ─────────────────────────────────────────────
 export async function createJobSchedule(data: {
   machineId: string;

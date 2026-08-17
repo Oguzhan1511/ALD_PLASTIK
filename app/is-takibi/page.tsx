@@ -12,6 +12,9 @@ export default async function IsTakibiPage() {
   // Bugünü YYYY-MM-DD formatında alıyoruz
   const today = new Date().toISOString().split("T")[0];
   const initialSchedules = await getJobSchedules(today);
+  
+  const { getUstaIsTakibiToken } = await import("@/lib/actions/is-takibi");
+  const ustaToken = await getUstaIsTakibiToken();
 
   return (
     <div className="p-6 h-[calc(100vh-64px)] overflow-hidden flex flex-col bg-gray-50">
@@ -28,6 +31,7 @@ export default async function IsTakibiPage() {
         rawMaterials={rawMaterials}
         initialDate={today}
         initialSchedules={initialSchedules}
+        ustaToken={ustaToken}
       />
     </div>
   );

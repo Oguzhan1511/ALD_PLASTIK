@@ -4,10 +4,11 @@ import { useState, useEffect } from "react";
 import { getJobSchedules, updateJobSchedule } from "@/lib/actions/is-takibi";
 import MachineDetailModal from "./MachineDetailModal";
 
-export default function IsTakibiClient({ machines, products, rawMaterials, initialDate, initialSchedules }: any) {
+export default function IsTakibiClient({ machines, products, rawMaterials, initialDate, initialSchedules, ustaToken }: any) {
   const [date, setDate] = useState(initialDate);
   const [schedules, setSchedules] = useState(initialSchedules);
   const [isLoading, setIsLoading] = useState(false);
+  const [copied, setCopied] = useState(false);
   
   const [selectedMachine, setSelectedMachine] = useState<any | null>(null);
 
@@ -40,12 +41,19 @@ export default function IsTakibiClient({ machines, products, rawMaterials, initi
     setSchedules(newSchedules);
   };
 
+  const handleCopyLink = () => {
+    const url = `${window.location.origin}/u/${ustaToken}/is-takibi`;
+    navigator.clipboard.writeText(url);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
   const activeSchedules = schedules.filter((s: any) => s.status !== "TAMAMLANDI");
   const completedSchedules = schedules.filter((s: any) => s.status === "TAMAMLANDI");
 
   return (
     <div className="flex-1 overflow-y-auto pb-10">
-      <div className="mb-6 bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between">
+      <div className="mb-6 bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-4">
           <label className="text-sm font-medium text-gray-700">Tarih Seçin:</label>
           <input 
@@ -56,6 +64,23 @@ export default function IsTakibiClient({ machines, products, rawMaterials, initi
           />
           {isLoading && <span className="text-sm text-gray-500 animate-pulse">Yükleniyor...</span>}
         </div>
+        
+        <button
+          onClick={handleCopyLink}
+          className="flex items-center justify-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 rounded-lg text-sm font-medium transition-colors border border-indigo-200"
+        >
+          {copied ? (
+            <>
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+              Kopyalandı!
+            </>
+          ) : (
+            <>
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" /></svg>
+              Ustalar İçin Linki Kopyala
+            </>
+          )}
+        </button>
       </div>
 
       <h2 className="text-xl font-bold text-gray-800 mb-4">Planlanan İşler</h2>
