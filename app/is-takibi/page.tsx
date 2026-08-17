@@ -9,8 +9,11 @@ export default async function IsTakibiPage() {
     getProductsAndRawMaterials(),
   ]);
 
-  // Bugünü YYYY-MM-DD formatında alıyoruz
-  const today = new Date().toISOString().split("T")[0];
+  // Bugünü YYYY-MM-DD formatında alıyoruz (Türkiye saatine göre UTC+3)
+  const now = new Date();
+  const turkeyTime = new Date(now.getTime() + 3 * 60 * 60 * 1000);
+  const today = turkeyTime.toISOString().split("T")[0];
+  
   const initialSchedules = await getJobSchedules(today);
   
   const { getUstaIsTakibiToken } = await import("@/lib/actions/is-takibi");

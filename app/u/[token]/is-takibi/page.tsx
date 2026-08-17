@@ -18,8 +18,9 @@ export default async function UstaIsTakibiPage({ params }: { params: Promise<{ t
     notFound();
   }
 
-  // Bu haftanın başı (Pazartesi) ve sonu (Pazar)
-  const now = new Date();
+  // Bu haftanın başı (Pazartesi) ve sonu (Pazar) - Türkiye Saati
+  const nowUTC = new Date();
+  const now = new Date(nowUTC.getTime() + 3 * 60 * 60 * 1000);
   const day = now.getDay() || 7; // 1-7 (Pazartesi-Pazar)
   
   const startOfWeek = new Date(now);
