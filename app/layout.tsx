@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { getSharedSession } from "@/lib/session";
 import { SessionProvider } from "@/components/layout/SessionProvider";
 import { ThemeProvider } from "@/components/layout/ThemeProvider";
 import { ClientLayoutWrapper } from "@/components/layout/ClientLayoutWrapper";
@@ -28,7 +27,7 @@ export default async function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const session = await getServerSession(authOptions);
+  const session = await getSharedSession();
 
   return (
     <html lang="tr" suppressHydrationWarning className={`${inter.variable} font-sans`}>

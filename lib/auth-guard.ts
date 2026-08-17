@@ -1,5 +1,4 @@
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { getSharedSession } from "@/lib/session";
 
 /**
  * Tüm server action'ların başında çağrılır.
@@ -7,7 +6,7 @@ import { authOptions } from "@/lib/auth";
  * ve action'ın geri kalanı hiç çalışmaz.
  */
 export async function requireAuth(): Promise<void> {
-  const session = await getServerSession(authOptions);
+  const session = await getSharedSession();
   if (!session) {
     throw new Error("Bu işlemi gerçekleştirmek için giriş yapmanız gerekmektedir.");
   }
