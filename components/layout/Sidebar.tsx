@@ -214,7 +214,7 @@ export function Sidebar({
 
         {/* Çıkış */}
         <button
-          onClick={() => signOut({ callbackUrl: "/login" })}
+          onClick={() => signOut({ callbackUrl: "https://ogzsystem.com" })}
           className={`nav-link w-full text-left ${isCollapsed ? "justify-center px-0" : ""}`}
           title={isCollapsed ? "Çıkış Yap" : undefined}
         >
