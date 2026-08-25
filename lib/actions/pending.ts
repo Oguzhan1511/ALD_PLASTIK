@@ -51,6 +51,7 @@ export async function createPendingProductionEntry(formData: FormData) {
   const productId = formData.get("productId") as string;
   const quantity = parseIntInput(formData.get("quantity") as string);
   const submittedByName = formData.get("submittedByName") as string;
+  const notes = formData.get("notes") as string;
 
   if (!productId) {
     throw new Error("Lütfen bir ürün seçin.");
@@ -68,6 +69,7 @@ export async function createPendingProductionEntry(formData: FormData) {
       productId,
       quantity,
       submittedByName: submittedByName.trim(),
+      notes: notes ? notes.trim() : null,
       status: "BEKLIYOR",
     },
   });
@@ -81,6 +83,7 @@ export async function createPendingShipmentEntry(formData: FormData) {
   const itemId = formData.get("itemId") as string;
   const quantity = parseDecimalInput(formData.get("quantity") as string);
   const submittedByName = formData.get("submittedByName") as string;
+  const notes = formData.get("notes") as string;
 
   if (!itemType || !direction) {
     throw new Error("Geçersiz form verisi.");
@@ -107,6 +110,7 @@ export async function createPendingShipmentEntry(formData: FormData) {
     type: pendingType,
     quantity,
     submittedByName: submittedByName.trim(),
+    notes: notes ? notes.trim() : null,
     status: "BEKLIYOR",
   };
 

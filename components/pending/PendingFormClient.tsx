@@ -20,6 +20,7 @@ type RecentEntry = {
   status: string;
   submittedAt: string;
   reviewedAt: string | null;
+  notes?: string | null;
   product?: { id: string; name: string; code: string | null } | null;
   rawMaterial?: { id: string; name: string; code: string | null; unit?: string } | null;
 };
@@ -48,6 +49,7 @@ export function PendingFormClient({ type, products, rawMaterials = [], title, re
   const [showItemDropdown, setShowItemDropdown] = useState(false);
   const [quantity, setQuantity] = useState("");
   const [submittedByName, setSubmittedByName] = useState("");
+  const [notes, setNotes] = useState("");
 
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -102,6 +104,7 @@ export function PendingFormClient({ type, products, rawMaterials = [], title, re
     const formData = new FormData();
     formData.set("quantity", quantity);
     formData.set("submittedByName", submittedByName);
+    if (notes) formData.set("notes", notes);
 
     startTransition(async () => {
       try {
@@ -120,6 +123,7 @@ export function PendingFormClient({ type, products, rawMaterials = [], title, re
         setItemSearch("");
         setQuantity("");
         setSubmittedByName("");
+        setNotes("");
         
         setTimeout(() => {
           setSuccess("");
@@ -293,6 +297,19 @@ export function PendingFormClient({ type, products, rawMaterials = [], title, re
               />
             </div>
 
+            <div>
+              <label className="block text-lg font-semibold text-slate-700 dark:text-slate-200 mb-2">
+                Açıklama <span className="text-sm font-normal text-slate-400">(Opsiyonel)</span>
+              </label>
+              <textarea
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                rows={2}
+                className="w-full p-4 text-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white border-2 border-slate-300 dark:border-slate-600 rounded-xl focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition-all outline-none resize-none"
+                placeholder="Eklemek istediğiniz notlar..."
+              />
+            </div>
+
             <button
               type="submit"
               disabled={isPending || !selectedItemId}
@@ -342,6 +359,11 @@ export function PendingFormClient({ type, products, rawMaterials = [], title, re
                   <div className="text-xs text-slate-500 mt-1">
                     {entry.submittedByName} • {new Date(entry.submittedAt).toLocaleString("tr-TR", {day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute:'2-digit'})}
                   </div>
+                  {entry.notes && (
+                    <div className="text-xs text-slate-600 mt-1 italic border-l-2 border-slate-300 pl-2">
+                      "{entry.notes}"
+                    </div>
+                  )}
                 </div>
                 <div className="text-right">
                   <div className="font-bold text-slate-700">

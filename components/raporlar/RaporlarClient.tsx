@@ -15,6 +15,7 @@ type PendingEntry = {
   submittedAt: string;
   reviewedAt: string | null;
   rejectionReason: string | null;
+  notes: string | null;
   product?: { id: string; name: string; code: string | null } | null;
   rawMaterial?: { id: string; name: string; code: string | null; unit?: string } | null;
 };
@@ -90,7 +91,14 @@ export function RaporlarClient({ pendingEntries, approvedEntries, rejectedEntrie
                   {entry.type === "SEVKIYAT_GIRISI" && <span className="badge badge-green">Sevkiyat Giriş</span>}
                   {entry.type === "SEVKIYAT_CIKISI" && <span className="badge badge-red">Sevkiyat Çıkış</span>}
                 </td>
-                <td className="font-medium text-slate-700">{entry.submittedByName}</td>
+                <td>
+                  <div className="font-medium text-slate-700">{entry.submittedByName}</div>
+                  {entry.notes && (
+                    <div className="text-xs text-slate-500 italic mt-0.5" title={entry.notes}>
+                      "{entry.notes.length > 30 ? entry.notes.substring(0, 30) + "..." : entry.notes}"
+                    </div>
+                  )}
+                </td>
                 <td>
                   <span className="text-xs font-semibold uppercase text-slate-500 mr-2">
                     {entry.productId ? "ÜRÜN" : "HAMMADDE"}
