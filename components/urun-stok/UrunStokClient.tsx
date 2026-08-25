@@ -84,7 +84,7 @@ export function UrunStokClient({ products }: UrunStokClientProps) {
   const handleExportPdf = async () => {
     try {
       const { exportToPdf } = await import("@/lib/utils/pdf-export");
-      const columns = ["Urun", "Ait Oldugu Mamul", "Kod", "Mevcut Stok", "Durum"];
+      const columns = ["Urun", "Ait Oldugu Mamul", "Kod", "Sistemdeki Stok", "Eldeki Stok", "Durum"];
       const tableData = filteredProducts.map(p => {
         const stock = parseFloat(p.currentStock.toString());
         const critical = p.criticalLevel ? parseFloat(p.criticalLevel.toString()) : null;
@@ -99,6 +99,7 @@ export function UrunStokClient({ products }: UrunStokClientProps) {
           p.parentProduct || "-",
           p.code || "-",
           stock.toLocaleString("tr-TR") + " adet",
+          " ", // Eldeki Stok
           durum
         ];
       });
@@ -118,7 +119,7 @@ export function UrunStokClient({ products }: UrunStokClientProps) {
   const handleExportExcel = async () => {
     try {
       const { exportToExcel } = await import("@/lib/utils/excel-export");
-      const columns = ["Ürün Adı", "Ait Olduğu Mamül", "Kod", "Mevcut Stok", "Durum"];
+      const columns = ["Ürün Adı", "Ait Olduğu Mamül", "Kod", "Sistemdeki Stok", "Eldeki Stok", "Durum"];
       const tableData = filteredProducts.map(p => {
         const stock = parseFloat(p.currentStock.toString());
         const critical = p.criticalLevel ? parseFloat(p.criticalLevel.toString()) : null;
@@ -133,6 +134,7 @@ export function UrunStokClient({ products }: UrunStokClientProps) {
           p.parentProduct || "-",
           p.code || "-",
           stock.toLocaleString("tr-TR") + " adet",
+          " ", // Eldeki stok
           durum
         ];
       });
@@ -291,7 +293,8 @@ export function UrunStokClient({ products }: UrunStokClientProps) {
                     <th>Ürün</th>
                     <th>Ait Olduğu Mamül</th>
                     <th>Kod</th>
-                    <th>Mevcut Stok</th>
+                    <th>Sistemdeki Stok</th>
+                    <th>Eldeki Stok</th>
                     <th>Durum</th>
                     <th>İşlemler</th>
                   </tr>
@@ -328,6 +331,7 @@ export function UrunStokClient({ products }: UrunStokClientProps) {
                             </span>
                           )}
                         </td>
+                        <td className="text-slate-300">—</td>
                         <td>
                           {isEmpty ? (
                             <span className="badge-red">Stok Yok</span>

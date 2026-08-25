@@ -142,13 +142,14 @@ export function HammaddeClient({ initialData }: HammaddeClientProps) {
   const handleExportPdf = async () => {
     try {
       const { exportToPdf } = await import("@/lib/utils/pdf-export");
-      const columns = ["Hammadde Adi", "Kod", "Mevcut Stok", "Kritik Seviye", "Durum"];
+      const columns = ["Hammadde Adi", "Kod", "Sistemdeki Stok", "Eldeki Stok", "Kritik Seviye", "Durum"];
       const tableData = filteredData.map(m => {
         const critical = isCritical(m.currentStock, m.criticalLevel);
         return [
           m.name,
           m.code || "-",
           formatStock(m.currentStock, m.unit),
+          " ", // Eldeki stok (boş)
           m.criticalLevel ? formatStock(m.criticalLevel, m.unit) : "-",
           critical ? "Kritik" : "Normal"
         ];
@@ -169,13 +170,14 @@ export function HammaddeClient({ initialData }: HammaddeClientProps) {
   const handleExportExcel = async () => {
     try {
       const { exportToExcel } = await import("@/lib/utils/excel-export");
-      const columns = ["Hammadde Adı", "Kod", "Mevcut Stok", "Kritik Seviye", "Durum"];
+      const columns = ["Hammadde Adı", "Kod", "Sistemdeki Stok", "Eldeki Stok", "Kritik Seviye", "Durum"];
       const tableData = filteredData.map(m => {
         const critical = isCritical(m.currentStock, m.criticalLevel);
         return [
           m.name,
           m.code || "-",
           formatStock(m.currentStock, m.unit),
+          " ", // Eldeki stok
           m.criticalLevel ? formatStock(m.criticalLevel, m.unit) : "-",
           critical ? "Kritik" : "Normal"
         ];
@@ -312,7 +314,8 @@ export function HammaddeClient({ initialData }: HammaddeClientProps) {
                   <tr>
                     <th>Hammadde Adı</th>
                     <th>Kod</th>
-                    <th>Mevcut Stok</th>
+                    <th>Sistemdeki Stok</th>
+                    <th>Eldeki Stok</th>
                     <th>Kritik Seviye</th>
                     <th>Durum</th>
                     <th>İşlemler</th>
@@ -336,6 +339,7 @@ export function HammaddeClient({ initialData }: HammaddeClientProps) {
                             {formatStock(m.currentStock, m.unit)}
                           </span>
                         </td>
+                        <td className="text-slate-300">—</td>
                         <td className="text-slate-500">
                           {m.criticalLevel
                             ? formatStock(m.criticalLevel, m.unit)
