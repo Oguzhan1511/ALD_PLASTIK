@@ -139,23 +139,61 @@ export function HammaddeClient({ initialData }: HammaddeClientProps) {
     });
   };
 
+  const handleExportPdf = async () => {
+    try {
+      const { exportToPdf } = await import("@/lib/utils/pdf-export");
+      const columns = ["Hammadde Adi", "Kod", "Mevcut Stok", "Kritik Seviye", "Durum"];
+      const tableData = filteredData.map(m => {
+        const critical = isCritical(m.currentStock, m.criticalLevel);
+        return [
+          m.name,
+          m.code || "-",
+          formatStock(m.currentStock, m.unit),
+          m.criticalLevel ? formatStock(m.criticalLevel, m.unit) : "-",
+          critical ? "Kritik" : "Normal"
+        ];
+      });
+
+      await exportToPdf({
+        title: "Hammadde Stok Raporu",
+        columns,
+        data: tableData,
+        filename: "hammadde-stok-raporu"
+      });
+    } catch (e) {
+      console.error(e);
+      alert("PDF olusturulurken bir hata olustu.");
+    }
+  };
+
   const todayLocal = getLocalISOTime();
 
   return (
     <>
       {/* Header */}
-      <div className="page-header">
+      <div className="page-header flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <h1 className="page-title">Hammadde Yönetimi</h1>
-        <button
-          id="btn-yeni-hammadde"
-          className="btn-primary btn"
-          onClick={() => setModal("create")}
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
-          Yeni Hammadde Ekle
-        </button>
+        <div className="flex gap-2">
+          <button
+            className="btn btn-secondary flex items-center gap-2"
+            onClick={handleExportPdf}
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+            PDF İndir
+          </button>
+          <button
+            id="btn-yeni-hammadde"
+            className="btn-primary btn"
+            onClick={() => setModal("create")}
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            Yeni Hammadde Ekle
+          </button>
+        </div>
       </div>
 
       <div className="page-body">

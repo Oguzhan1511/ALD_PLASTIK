@@ -45,7 +45,7 @@ export const authOptions: AuthOptions = {
         sameSite: "lax",
         path: "/",
         secure: process.env.NODE_ENV === "production",
-        domain: ".ogzsystem.com",
+        domain: process.env.NODE_ENV === "production" ? ".ogzsystem.com" : undefined,
         maxAge: 365 * 24 * 60 * 60, // Persistent for 365 days
       },
     },
