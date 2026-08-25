@@ -115,6 +115,39 @@ export function UrunStokClient({ products }: UrunStokClientProps) {
     }
   };
 
+  const handleExportExcel = async () => {
+    try {
+      const { exportToExcel } = await import("@/lib/utils/excel-export");
+      const columns = ["Ürün Adı", "Ait Olduğu Mamül", "Kod", "Mevcut Stok", "Durum"];
+      const tableData = filteredProducts.map(p => {
+        const stock = parseFloat(p.currentStock.toString());
+        const critical = p.criticalLevel ? parseFloat(p.criticalLevel.toString()) : null;
+        const isCritical = critical !== null && stock <= critical;
+        const isEmpty = stock === 0;
+        let durum = "Yeterli";
+        if (isEmpty) durum = "Stok Yok";
+        else if (isCritical) durum = "Kritik";
+
+        return [
+          p.name,
+          p.parentProduct || "-",
+          p.code || "-",
+          stock.toLocaleString("tr-TR") + " adet",
+          durum
+        ];
+      });
+
+      exportToExcel({
+        columns,
+        data: tableData,
+        filename: "urun-stok-raporu"
+      });
+    } catch (e) {
+      console.error(e);
+      alert("Excel oluşturulurken bir hata oluştu.");
+    }
+  };
+
   // Arama ve Sıralama
   const filteredProducts = useMemo(() => {
     let result = products;
@@ -164,15 +197,26 @@ export function UrunStokClient({ products }: UrunStokClientProps) {
     <>
       <div className="page-header flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <h1 className="page-title">Ürün Stok Takibi</h1>
-        <button
-          className="btn btn-secondary flex items-center gap-2"
-          onClick={handleExportPdf}
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-          </svg>
-          PDF İndir
-        </button>
+        <div className="flex gap-2">
+          <button
+            className="btn btn-secondary flex items-center gap-2"
+            onClick={handleExportExcel}
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+            Excel İndir
+          </button>
+          <button
+            className="btn btn-secondary flex items-center gap-2"
+            onClick={handleExportPdf}
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+            PDF İndir
+          </button>
+        </div>
       </div>
 
       <div className="page-body space-y-6">
