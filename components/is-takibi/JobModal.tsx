@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { createJobSchedule, updateJobSchedule, completeJobSchedule } from "@/lib/actions/is-takibi";
+import { PRODUCT_CYCLES } from "@/lib/utils/product-cycles";
 
 export default function JobModal({ machine, date, job, products, rawMaterials, onClose, onRefresh }: any) {
   const isEdit = !!job;
@@ -50,6 +51,23 @@ export default function JobModal({ machine, date, job, products, rawMaterials, o
           updates.rawMaterialId = firstRecipe.rawMaterialId;
         }
       }
+    }
+
+    // Otomatik süre hesaplama (ürün veya miktar değişirse)
+    const currentExpectedQty = name === "expectedQty" ? value : formData.expectedQty;
+    const currentProductId = name === "productId" ? value : formData.productId;
+    
+    if (currentExpectedQty && currentProductId && Number(currentExpectedQty) > 0) {
+       const selectedProduct = products.find((p: any) => p.id === currentProductId);
+       if (selectedProduct && selectedProduct.code) {
+         const cycleInfo = PRODUCT_CYCLES.find(c => c.code === selectedProduct.code);
+         if (cycleInfo) {
+           const totalCycles = Math.ceil(Number(currentExpectedQty) / cycleInfo.cavity);
+           const totalSeconds = totalCycles * cycleInfo.cycle;
+           const hours = totalSeconds / 3600;
+           updates.durationHours = Number(hours.toFixed(2));
+         }
+       }
     }
 
     setFormData(prev => ({ ...prev, ...updates }));
