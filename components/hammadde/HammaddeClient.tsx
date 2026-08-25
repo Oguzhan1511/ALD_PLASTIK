@@ -155,11 +155,12 @@ export function HammaddeClient({ initialData }: HammaddeClientProps) {
         ];
       });
 
+      const dateStr = new Date().toISOString().split("T")[0];
       await exportToPdf({
         title: "Hammadde Stok Raporu",
         columns,
         data: tableData,
-        filename: "hammadde-stok-raporu"
+        filename: `hammadde-stok-raporu-${dateStr}`
       });
     } catch (e) {
       console.error(e);
@@ -183,10 +184,11 @@ export function HammaddeClient({ initialData }: HammaddeClientProps) {
         ];
       });
 
+      const dateStr = new Date().toISOString().split("T")[0];
       exportToExcel({
         columns,
         data: tableData,
-        filename: "hammadde-stok-raporu"
+        filename: `hammadde-stok-raporu-${dateStr}`
       });
     } catch (e) {
       console.error(e);

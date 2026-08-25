@@ -104,11 +104,12 @@ export function UrunStokClient({ products }: UrunStokClientProps) {
         ];
       });
 
+      const dateStr = new Date().toISOString().split("T")[0];
       await exportToPdf({
         title: "Urun Stok Raporu",
         columns,
         data: tableData,
-        filename: "urun-stok-raporu"
+        filename: `urun-stok-raporu-${dateStr}`
       });
     } catch (e) {
       console.error(e);
@@ -139,10 +140,11 @@ export function UrunStokClient({ products }: UrunStokClientProps) {
         ];
       });
 
+      const dateStr = new Date().toISOString().split("T")[0];
       exportToExcel({
         columns,
         data: tableData,
-        filename: "urun-stok-raporu"
+        filename: `urun-stok-raporu-${dateStr}`
       });
     } catch (e) {
       console.error(e);
