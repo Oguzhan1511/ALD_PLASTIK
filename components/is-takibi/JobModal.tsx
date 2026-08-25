@@ -18,7 +18,7 @@ export default function JobModal({ machine, date, job, products, rawMaterials, o
   const [productSearch, setProductSearch] = useState(() => {
     if (job?.productId) {
       const p = products.find((x: any) => x.id === job.productId);
-      return p ? p.name : "";
+      return p ? (p.code ? `${p.code} - ${p.name}` : p.name) : "";
     }
     return "";
   });
@@ -263,7 +263,11 @@ export default function JobModal({ machine, date, job, products, rawMaterials, o
               onChange={(e) => {
                 const val = e.target.value;
                 setProductSearch(val);
-                const selected = products.find((p: any) => p.name === val);
+                const selected = products.find((p: any) => 
+                  (p.code ? `${p.code} - ${p.name}` : p.name) === val || 
+                  p.name === val || 
+                  p.code === val
+                );
                 if (selected) {
                   handleChange({ target: { name: 'productId', value: selected.id } } as any);
                 } else {
@@ -271,12 +275,12 @@ export default function JobModal({ machine, date, job, products, rawMaterials, o
                 }
               }}
               required
-              placeholder="Ürün Ara veya Seçin..."
+              placeholder="Ürün Kodu veya Adı ile Ara..."
               className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             />
             <datalist id="products-list">
               {products.map((p: any) => (
-                <option key={p.id} value={p.name} />
+                <option key={p.id} value={p.code ? `${p.code} - ${p.name}` : p.name} />
               ))}
             </datalist>
           </div>
