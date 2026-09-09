@@ -66,7 +66,7 @@ export async function createProductionRecord(formData: FormData) {
   revalidatePath("/fire");
   revalidatePath("/");
 
-  return { success: true, data: { ...result, fireQty } };
+  return JSON.parse(JSON.stringify({ success: true, data: { ...result, fireQty } }));
 }
 
 // ─────────────────────────────────────────────

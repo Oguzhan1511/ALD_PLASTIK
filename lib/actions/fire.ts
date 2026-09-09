@@ -18,7 +18,7 @@ export async function createFireRecord(
     data: { productId, quantity, date, description },
   });
   revalidatePath("/fire");
-  return record;
+  return JSON.parse(JSON.stringify(record));
 }
 
 // ─────────────────────────────────────────────
