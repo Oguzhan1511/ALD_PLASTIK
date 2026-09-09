@@ -168,7 +168,7 @@ export default function ProductCyclesModal({ onClose, onUpdated }: { onClose: ()
                   const canEdit = !!item.code;
                   return (
                     <tr
-                      key={item.code ?? `no-code-${idx}`}
+                      key={`${item.code ?? "no-code"}-${idx}`}
                       className={`transition-colors ${
                         item.isOverridden
                           ? "bg-amber-50/50"

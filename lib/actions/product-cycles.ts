@@ -13,7 +13,7 @@ export type ProductCycleItem = {
   hasDefault: boolean; // PRODUCT_CYCLES listesinde var mı
 };
 
-// Tüm ürünleri (override edilmiş değerleriyle birlikte) getir
+// Tüm ürünleri (override edilmiş değerleriyle birlikte) getir — kod bazında tekil
 export async function getProductCycles(): Promise<ProductCycleItem[]> {
   const [overrides, allProducts] = await Promise.all([
     prisma.productCycleOverride.findMany(),
@@ -26,7 +26,16 @@ export async function getProductCycles(): Promise<ProductCycleItem[]> {
   const overrideMap = new Map(overrides.map((o) => [o.code, o]));
   const cycleMap = new Map(PRODUCT_CYCLES.map((c) => [c.code, c]));
 
-  return allProducts.map((p) => {
+  // Aynı koda sahip birden fazla ürün varsa sadece ilkini al
+  const seenCodes = new Set<string>();
+  const uniqueProducts = allProducts.filter((p) => {
+    if (!p.code) return true; // Kodsuz ürünler her zaman dahil
+    if (seenCodes.has(p.code)) return false;
+    seenCodes.add(p.code);
+    return true;
+  });
+
+  return uniqueProducts.map((p) => {
     const code = p.code ?? null;
     const baseInfo = code ? cycleMap.get(code) : undefined;
     const override = code ? overrideMap.get(code) : undefined;
