@@ -34,10 +34,13 @@ export default async function FirePage({ searchParams }: { searchParams: { start
   const startStr = startDate.toISOString().split("T")[0];
   const endStr = endDate.toISOString().split("T")[0];
 
+  const serializedRecords = JSON.parse(JSON.stringify(records));
+  const serializedSummary = JSON.parse(JSON.stringify(summary));
+
   return (
     <FireClient
-      initialRecords={records}
-      summary={summary}
+      initialRecords={serializedRecords}
+      summary={serializedSummary}
       startDate={startStr}
       endDate={endStr}
     />
