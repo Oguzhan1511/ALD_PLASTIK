@@ -9,11 +9,12 @@ import {
 } from "@/lib/actions/product-cycles";
 
 export type ProductCycleItem = {
-  code: string;
+  code: string | null;
   name: string;
-  cavity: number;
-  cycle: number;
+  cavity: number | null;
+  cycle: number | null;
   isOverridden: boolean;
+  hasDefault: boolean;
 };
 
 export default function ProductCyclesModal({ onClose, onUpdated }: { onClose: () => void; onUpdated?: () => void }) {
@@ -41,14 +42,15 @@ export default function ProductCyclesModal({ onClose, onUpdated }: { onClose: ()
   const filtered = cycles.filter(
     (c) =>
       c.name.toLowerCase().includes(search.toLowerCase()) ||
-      c.code.toLowerCase().includes(search.toLowerCase())
+      (c.code ?? "").toLowerCase().includes(search.toLowerCase())
   );
 
   const hasOverrides = cycles.some((c) => c.isOverridden);
 
   const handleStartEdit = (item: ProductCycleItem) => {
+    if (!item.code) return;
     setEditingCode(item.code);
-    setEditForm({ cavity: item.cavity, cycle: item.cycle });
+    setEditForm({ cavity: item.cavity ?? 1, cycle: item.cycle ?? 60 });
   };
 
   const handleSaveEdit = (code: string) => {
@@ -92,7 +94,7 @@ export default function ProductCyclesModal({ onClose, onUpdated }: { onClose: ()
           <div>
             <h2 className="text-xl font-bold text-gray-800">Ürün Üretim Süreleri</h2>
             <p className="text-xs text-gray-500 mt-0.5">
-              Ürünlerin kalıp adedi ve çevrim sürelerini düzenleyebilirsiniz. Değişiklikler Supabase'e kaydedilir.
+              Ürünlerin kalıp adedi ve çevrim sürelerini düzenleyebilirsiniz.
             </p>
           </div>
           <button
@@ -161,19 +163,38 @@ export default function ProductCyclesModal({ onClose, onUpdated }: { onClose: ()
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-100">
-                {filtered.map((item) => {
-                  const isEditing = editingCode === item.code;
+                {filtered.map((item, idx) => {
+                  const isEditing = item.code ? editingCode === item.code : false;
+                  const canEdit = !!item.code;
                   return (
-                    <tr key={item.code} className={`transition-colors ${item.isOverridden ? "bg-amber-50/50" : "hover:bg-gray-50"}`}>
-                      <td className="px-4 py-3 text-sm font-mono text-gray-600 whitespace-nowrap">
+                    <tr
+                      key={item.code ?? `no-code-${idx}`}
+                      className={`transition-colors ${
+                        item.isOverridden
+                          ? "bg-amber-50/50"
+                          : !item.cavity && !item.cycle
+                          ? "bg-gray-50/60"
+                          : "hover:bg-gray-50"
+                      }`}
+                    >
+                      {/* Kod */}
+                      <td className="px-4 py-3 text-sm font-mono whitespace-nowrap">
                         <div className="flex items-center gap-1.5">
                           {item.isOverridden && (
                             <span className="inline-block w-2 h-2 rounded-full bg-amber-400 flex-shrink-0" title="Özelleştirilmiş"></span>
                           )}
-                          {item.code}
+                          {item.code ? (
+                            <span className="text-gray-600">{item.code}</span>
+                          ) : (
+                            <span className="text-gray-300 italic text-xs">kod yok</span>
+                          )}
                         </div>
                       </td>
+
+                      {/* Ad */}
                       <td className="px-4 py-3 text-sm text-gray-800">{item.name}</td>
+
+                      {/* Kalıp adedi */}
                       <td className="px-4 py-3 text-center">
                         {isEditing ? (
                           <input
@@ -183,12 +204,16 @@ export default function ProductCyclesModal({ onClose, onUpdated }: { onClose: ()
                             onChange={(e) => setEditForm((f) => ({ ...f, cavity: Number(e.target.value) }))}
                             className="w-20 text-center text-sm border border-blue-400 rounded-md px-2 py-1 focus:ring-2 focus:ring-blue-500 focus:outline-none"
                           />
-                        ) : (
+                        ) : item.cavity != null ? (
                           <span className={`text-sm font-semibold ${item.isOverridden ? "text-amber-700" : "text-gray-700"}`}>
                             {item.cavity}
                           </span>
+                        ) : (
+                          <span className="text-xs text-gray-300">—</span>
                         )}
                       </td>
+
+                      {/* Çevrim süresi */}
                       <td className="px-4 py-3 text-center">
                         {isEditing ? (
                           <div className="flex items-center justify-center gap-1">
@@ -201,20 +226,24 @@ export default function ProductCyclesModal({ onClose, onUpdated }: { onClose: ()
                             />
                             <span className="text-xs text-gray-500">sn</span>
                           </div>
-                        ) : (
+                        ) : item.cycle != null ? (
                           <div>
                             <span className={`text-sm font-semibold ${item.isOverridden ? "text-amber-700" : "text-gray-700"}`}>
                               {formatCycle(item.cycle)}
                             </span>
                             <span className="block text-xs text-gray-400">({item.cycle}sn)</span>
                           </div>
+                        ) : (
+                          <span className="text-xs text-gray-300">—</span>
                         )}
                       </td>
+
+                      {/* İşlem */}
                       <td className="px-4 py-3 text-center">
                         {isEditing ? (
                           <div className="flex items-center justify-center gap-2">
                             <button
-                              onClick={() => handleSaveEdit(item.code)}
+                              onClick={() => handleSaveEdit(item.code!)}
                               disabled={isPending}
                               className="p-1.5 text-white bg-blue-600 hover:bg-blue-700 rounded-md transition-colors disabled:opacity-50"
                               title="Kaydet"
@@ -236,19 +265,21 @@ export default function ProductCyclesModal({ onClose, onUpdated }: { onClose: ()
                           </div>
                         ) : (
                           <div className="flex items-center justify-center gap-2">
-                            <button
-                              onClick={() => handleStartEdit(item)}
-                              disabled={isPending}
-                              className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-md transition-colors disabled:opacity-50"
-                              title="Düzenle"
-                            >
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                              </svg>
-                            </button>
+                            {canEdit && (
+                              <button
+                                onClick={() => handleStartEdit(item)}
+                                disabled={isPending}
+                                className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-md transition-colors disabled:opacity-50"
+                                title="Düzenle"
+                              >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                </svg>
+                              </button>
+                            )}
                             {item.isOverridden && (
                               <button
-                                onClick={() => handleReset(item.code)}
+                                onClick={() => handleReset(item.code!)}
                                 disabled={isPending}
                                 className="p-1.5 text-amber-600 hover:bg-amber-50 rounded-md transition-colors disabled:opacity-50"
                                 title="Varsayılana sıfırla"
@@ -283,8 +314,6 @@ export default function ProductCyclesModal({ onClose, onUpdated }: { onClose: ()
               <span className="inline-block w-2 h-2 rounded-full bg-amber-400"></span>
               Özelleştirilmiş değer
             </div>
-            <span>·</span>
-            <span>Değişiklikler Supabase&apos;e kaydedilir, tüm cihazlardan erişilebilir.</span>
           </div>
           <button
             onClick={onClose}
