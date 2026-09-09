@@ -22,12 +22,10 @@ export async function createFireRecord(
 }
 
 // ─────────────────────────────────────────────
-// Fire Kayıtları — Aylık filtreli
+// Fire Kayıtları — Tarih aralıklı
 // ─────────────────────────────────────────────
-export async function getFireRecords(year: number, month: number, limit?: number) {
+export async function getFireRecords(start: Date, end: Date, limit?: number) {
   await requireAuth();
-  const start = new Date(year, month - 1, 1);
-  const end = new Date(year, month, 0, 23, 59, 59);
 
   return prisma.fireRecord.findMany({
     where: { date: { gte: start, lte: end } },
@@ -38,12 +36,10 @@ export async function getFireRecords(year: number, month: number, limit?: number
 }
 
 // ─────────────────────────────────────────────
-// Ürün Bazında Fire Özeti (aylık)
+// Ürün Bazında Fire Özeti (Tarih aralıklı)
 // ─────────────────────────────────────────────
-export async function getFireSummaryByProduct(year: number, month: number) {
+export async function getFireSummaryByProduct(start: Date, end: Date) {
   await requireAuth();
-  const start = new Date(year, month - 1, 1);
-  const end = new Date(year, month, 0, 23, 59, 59);
 
   // O aya ait fire ve üretim kayıtlarını eş zamanlı çekiyoruz
   const [fireRecords, prodRecords] = await Promise.all([

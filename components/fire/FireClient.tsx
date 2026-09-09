@@ -1,6 +1,10 @@
 "use client";
 
+import { useState } from "react";
 import { useRouter } from "next/navigation";
+import * as XLSX from "xlsx";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 
 interface FireRecord {
   id: string;
@@ -22,54 +26,111 @@ interface SummaryItem {
 interface FireClientProps {
   initialRecords: FireRecord[];
   summary: SummaryItem[];
-  currentMonth: number;
-  currentYear: number;
+  startDate: string;
+  endDate: string;
 }
 
-const MONTHS = [
-  "Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran",
-  "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"
-];
-
-export function FireClient({ initialRecords, summary, currentMonth, currentYear }: FireClientProps) {
+export function FireClient({ initialRecords, summary, startDate, endDate }: FireClientProps) {
   const router = useRouter();
+  const [filterStart, setFilterStart] = useState(startDate);
+  const [filterEnd, setFilterEnd] = useState(endDate);
+
   const totalFire = summary.reduce((sum, item) => sum + item.fireTotal, 0);
 
-  const handleMonthChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const [y, m] = e.target.value.split("-");
-    router.push(`/fire?y=${y}&m=${m}`);
+  const handleFilter = () => {
+    router.push(`/fire?start=${filterStart}&end=${filterEnd}`);
   };
 
-  // Son 12 ayı oluştur
-  const monthOptions = [];
-  const now = new Date();
-  for (let i = 0; i < 12; i++) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    monthOptions.push({
-      value: `${d.getFullYear()}-${d.getMonth() + 1}`,
-      label: `${MONTHS[d.getMonth()]} ${d.getFullYear()}`,
-    });
-  }
+  const handleExportExcel = () => {
+    const data = initialRecords.map((r) => ({
+      Tarih: new Date(r.date).toLocaleString("tr-TR"),
+      "Ürün Kodu": r.product.code || "-",
+      "Ürün Adı": r.product.name,
+      "Fire Adedi": r.quantity,
+      Açıklama: r.description || "-",
+    }));
 
-  const currentValue = `${currentYear}-${currentMonth}`;
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Fireler");
+    XLSX.writeFile(wb, `Fire_Kayitlari_${startDate}_${endDate}.xlsx`);
+  };
+
+  const handleExportPdf = () => {
+    const doc = new jsPDF();
+    
+    // TR Karakter desteği için varsayılan fontları kullanamıyoruz ama standart jspdf fontları 
+    // ingilizce olduğu için bazı tr karakterler çıkmaz. Basit tutalım.
+    doc.text(`Fire Kayitlari (${startDate} - ${endDate})`, 14, 15);
+
+    const tableData = initialRecords.map((r) => [
+      new Date(r.date).toLocaleDateString("tr-TR"),
+      r.product.code || "-",
+      r.product.name,
+      r.quantity.toString(),
+      r.description || "-"
+    ]);
+
+    autoTable(doc, {
+      head: [["Tarih", "Urun Kodu", "Urun Adi", "Adet", "Aciklama"]],
+      body: tableData,
+      startY: 20,
+      styles: { font: "helvetica" },
+    });
+
+    doc.save(`Fire_Kayitlari_${startDate}_${endDate}.pdf`);
+  };
 
   return (
     <>
-      <div className="page-header flex-col sm:flex-row gap-4 items-start sm:items-center">
+      <div className="page-header flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
         <div>
           <h1 className="page-title">Fire Takibi</h1>
           <p className="text-sm text-slate-500 mt-1">Üretim sırasında oluşan ıskarta / fire miktarları</p>
         </div>
         
-        <select
-          value={currentValue}
-          onChange={handleMonthChange}
-          className="form-input max-w-xs bg-white"
-        >
-          {monthOptions.map(opt => (
-            <option key={opt.value} value={opt.value}>{opt.label}</option>
-          ))}
-        </select>
+        <div className="flex flex-col sm:flex-row items-center gap-3">
+          <div className="flex items-center gap-2">
+            <input 
+              type="date" 
+              className="form-input bg-white text-sm" 
+              value={filterStart} 
+              onChange={e => setFilterStart(e.target.value)} 
+            />
+            <span className="text-slate-400">-</span>
+            <input 
+              type="date" 
+              className="form-input bg-white text-sm" 
+              value={filterEnd} 
+              onChange={e => setFilterEnd(e.target.value)} 
+            />
+            <button 
+              onClick={handleFilter}
+              className="btn btn-primary px-3 py-1.5"
+            >
+              Filtrele
+            </button>
+          </div>
+
+          <div className="h-6 w-px bg-slate-200 hidden sm:block mx-1"></div>
+
+          <div className="flex items-center gap-2">
+            <button 
+              onClick={handleExportExcel}
+              className="btn bg-green-50 text-green-700 border border-green-200 hover:bg-green-100 px-3 py-1.5 flex items-center gap-1.5"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+              Excel
+            </button>
+            <button 
+              onClick={handleExportPdf}
+              className="btn bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 px-3 py-1.5 flex items-center gap-1.5"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+              PDF
+            </button>
+          </div>
+        </div>
       </div>
 
       <div className="page-body">
@@ -86,7 +147,7 @@ export function FireClient({ initialRecords, summary, currentMonth, currentYear 
                   {totalFire.toLocaleString("tr-TR")}
                 </div>
                 <div className="text-sm text-slate-400 mt-1">
-                  {MONTHS[currentMonth - 1]} {currentYear}
+                  {new Date(startDate).toLocaleDateString("tr-TR")} - {new Date(endDate).toLocaleDateString("tr-TR")}
                 </div>
               </div>
             </div>
