@@ -1,6 +1,9 @@
 "use client";
 
 import { useState, useTransition, useCallback, Fragment } from "react";
+import * as XLSX from "xlsx";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 import { Pagination } from "@/components/ui/Pagination";
 import { Modal } from "@/components/ui/Modal";
 import { getStockMovements, getStockCard, MovementFilters, MovementType } from "@/lib/actions/hareket";
@@ -249,6 +252,113 @@ export function HareketiClient({
     });
   };
 
+  const exportHammaddeData = async (format: "excel" | "pdf") => {
+    const f = {
+      searchQuery: hFilterMaterial || undefined,
+      type: (hFilterType as MovementType) || undefined,
+      startDate: hFilterStart || undefined,
+      endDate: hFilterEnd || undefined,
+      page: 1,
+      pageSize: 10000,
+    };
+    const res = await getStockMovements(f);
+    const data = res.movements as Movement[];
+
+    if (format === "excel") {
+      const excelData = data.map((r) => ({
+        Tarih: new Date(r.date).toLocaleString("tr-TR"),
+        "Hammadde": r.rawMaterial.name,
+        "Tip": r.type.replace("_", " "),
+        "Miktar": r.amount,
+        "Birim": r.rawMaterial.unit,
+        "Açıklama": r.description || "-",
+      }));
+
+      const ws = XLSX.utils.json_to_sheet(excelData);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "HammaddeHareketleri");
+      XLSX.writeFile(wb, `Hammadde_Hareketleri.xlsx`);
+    } else {
+      const doc = new jsPDF();
+      doc.text(`Hammadde Hareketleri`, 14, 15);
+
+      const tableData = data.map((r) => [
+        new Date(r.date).toLocaleDateString("tr-TR"),
+        r.rawMaterial.name,
+        r.type.replace("_", " "),
+        r.amount.toString(),
+        r.rawMaterial.unit,
+        r.description || "-"
+      ]);
+
+      autoTable(doc, {
+        head: [["Tarih", "Hammadde", "Tip", "Miktar", "Birim", "Açıklama"]],
+        body: tableData,
+        startY: 20,
+        styles: { font: "helvetica" },
+      });
+      doc.save(`Hammadde_Hareketleri.pdf`);
+    }
+  };
+
+  const exportUrunData = async (format: "excel" | "pdf") => {
+    let calculatedType: string | string[] | undefined = undefined;
+    if (uPrimaryFilter === "URETIM") {
+      calculatedType = ["URETIM_GIRISI"];
+    } else if (uPrimaryFilter === "SEVKIYAT") {
+      calculatedType = ["SEVKIYAT_GIRISI", "SEVKIYAT_CIKISI", "GRUP_SEVKIYAT_CIKISI"];
+    } else if (uPrimaryFilter === "ALL") {
+      calculatedType = ["URETIM_GIRISI", "SEVKIYAT_GIRISI", "SEVKIYAT_CIKISI", "GRUP_SEVKIYAT_CIKISI", "SATIS_CIKISI", "MANUEL_GIRIS", "MANUEL_CIKIS", "DUZELTME", "URETIM_IPTALI", "SEVKIYAT_IPTALI"];
+    }
+
+    const f = {
+      searchQuery: uFilterProduct || undefined,
+      type: calculatedType,
+      startDate: uFilterStart || undefined,
+      endDate: uFilterEnd || undefined,
+      page: 1,
+      pageSize: 10000,
+    };
+    const res = await getProductStockMovementsPaginated(f);
+    const data = res.movements as UrunMovement[];
+
+    if (format === "excel") {
+      const excelData = data.map((r) => ({
+        Tarih: new Date(r.date).toLocaleString("tr-TR"),
+        "Ürün Kodu": r.product.code || "-",
+        "Ürün Adı": r.product.name,
+        "Tip": r.type.replace("_", " "),
+        "Miktar": r.quantity,
+        "Açıklama": r.description || "-",
+      }));
+
+      const ws = XLSX.utils.json_to_sheet(excelData);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "UrunHareketleri");
+      XLSX.writeFile(wb, `Urun_Hareketleri.xlsx`);
+    } else {
+      const doc = new jsPDF();
+      doc.text(`Urun Hareketleri`, 14, 15);
+
+      const tableData = data.map((r) => [
+        new Date(r.date).toLocaleDateString("tr-TR"),
+        r.product.code || "-",
+        r.product.name,
+        r.type.replace("_", " "),
+        r.quantity.toString(),
+        r.description || "-"
+      ]);
+
+      autoTable(doc, {
+        head: [["Tarih", "Urun Kodu", "Urun Adi", "Tip", "Adet", "Aciklama"]],
+        body: tableData,
+        startY: 20,
+        styles: { font: "helvetica" },
+      });
+      doc.save(`Urun_Hareketleri.pdf`);
+    }
+  };
+
   // ── Hammadde iptal seçim toggle ──
   const toggleHSelect = (id: string) => {
     setHSelectedIds(prev => {
@@ -417,22 +527,40 @@ export function HareketiClient({
                     />
                   </div>
                 </div>
-                <div className="flex flex-col sm:flex-row gap-2 mt-4">
-                  <button className="btn btn-primary w-full sm:w-auto justify-center" onClick={handleHFilter} disabled={isPending}>
-                    {isPending ? "Yükleniyor..." : "Filtrele"}
-                  </button>
-                  <button
-                    className="btn btn-secondary w-full sm:w-auto justify-center"
-                    onClick={() => {
-                      setHFilterMaterial("");
-                      setHFilterType("");
-                      setHFilterStart("");
-                      setHFilterEnd("");
-                      fetchHMovements(1, {});
-                    }}
-                  >
-                    Sıfırla
-                  </button>
+                <div className="flex flex-col sm:flex-row gap-2 mt-4 justify-between">
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <button className="btn btn-primary w-full sm:w-auto justify-center" onClick={handleHFilter} disabled={isPending}>
+                      {isPending ? "Yükleniyor..." : "Filtrele"}
+                    </button>
+                    <button
+                      className="btn btn-secondary w-full sm:w-auto justify-center"
+                      onClick={() => {
+                        setHFilterMaterial("");
+                        setHFilterType("");
+                        setHFilterStart("");
+                        setHFilterEnd("");
+                        fetchHMovements(1, {});
+                      }}
+                    >
+                      Sıfırla
+                    </button>
+                  </div>
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <button 
+                      onClick={() => exportHammaddeData("excel")}
+                      className="btn bg-green-50 text-green-700 border border-green-200 hover:bg-green-100 px-3 py-1.5 flex items-center gap-1.5 justify-center"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                      Excel
+                    </button>
+                    <button 
+                      onClick={() => exportHammaddeData("pdf")}
+                      className="btn bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 px-3 py-1.5 flex items-center gap-1.5 justify-center"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                      PDF
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -641,23 +769,41 @@ export function HareketiClient({
                     </div>
                   </div>
                 </div>
-                <div className="flex flex-col sm:flex-row gap-2 mt-5">
-                  <button className="btn btn-primary w-full sm:w-auto justify-center" onClick={handleUFilter} disabled={isPending}>
-                    {isPending ? "Yükleniyor..." : "Filtreleri Uygula"}
-                  </button>
-                  <button
-                    className="btn btn-secondary w-full sm:w-auto justify-center"
-                    onClick={() => {
-                      setUFilterProduct("");
-                      setUPrimaryFilter("ALL");
-                      setUSecondaryUretim("ALL");
-                      setUFilterStart("");
-                      setUFilterEnd("");
-                      fetchUMovements(1, { type: undefined, searchQuery: undefined, startDate: undefined, endDate: undefined });
-                    }}
-                  >
-                    Sıfırla
-                  </button>
+                <div className="flex flex-col sm:flex-row gap-2 mt-5 justify-between">
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <button className="btn btn-primary w-full sm:w-auto justify-center" onClick={handleUFilter} disabled={isPending}>
+                      {isPending ? "Yükleniyor..." : "Filtreleri Uygula"}
+                    </button>
+                    <button
+                      className="btn btn-secondary w-full sm:w-auto justify-center"
+                      onClick={() => {
+                        setUFilterProduct("");
+                        setUPrimaryFilter("ALL");
+                        setUSecondaryUretim("ALL");
+                        setUFilterStart("");
+                        setUFilterEnd("");
+                        fetchUMovements(1, { type: undefined, searchQuery: undefined, startDate: undefined, endDate: undefined });
+                      }}
+                    >
+                      Sıfırla
+                    </button>
+                  </div>
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <button 
+                      onClick={() => exportUrunData("excel")}
+                      className="btn bg-green-50 text-green-700 border border-green-200 hover:bg-green-100 px-3 py-1.5 flex items-center gap-1.5 justify-center"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                      Excel
+                    </button>
+                    <button 
+                      onClick={() => exportUrunData("pdf")}
+                      className="btn bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 px-3 py-1.5 flex items-center gap-1.5 justify-center"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                      PDF
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
