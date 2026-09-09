@@ -42,13 +42,21 @@ export function FireClient({ initialRecords, summary, startDate, endDate }: Fire
   };
 
   const handleExportExcel = () => {
-    const data = initialRecords.map((r) => ({
+    const data: any[] = initialRecords.map((r) => ({
       Tarih: new Date(r.date).toLocaleString("tr-TR"),
       "Ürün Kodu": r.product.code || "-",
       "Ürün Adı": r.product.name,
       "Fire Adedi": r.quantity,
       Açıklama: r.description || "-",
     }));
+
+    data.push({
+      Tarih: "",
+      "Ürün Kodu": "",
+      "Ürün Adı": "TOPLAM FİRE:",
+      "Fire Adedi": totalFire,
+      Açıklama: "",
+    });
 
     const ws = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();
@@ -77,6 +85,10 @@ export function FireClient({ initialRecords, summary, startDate, endDate }: Fire
       startY: 20,
       styles: { font: "helvetica" },
     });
+
+    const finalY = (doc as any).lastAutoTable?.finalY || 20;
+    doc.setFont("helvetica", "bold");
+    doc.text(`Toplam Fire: ${totalFire.toLocaleString("tr-TR")} adet`, 14, finalY + 10);
 
     doc.save(`Fire_Kayitlari_${startDate}_${endDate}.pdf`);
   };
