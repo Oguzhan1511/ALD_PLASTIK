@@ -36,6 +36,7 @@ export async function createProductionRecord(formData: FormData) {
   const quantityStr = formData.get("quantity") as string;
   const description = formData.get("description") as string;
   const dateStr = formData.get("date") as string;
+  const fireQtyStr = formData.get("fireQty") as string;
 
   if (!productId) throw new Error("Ürün seçimi zorunludur.");
 
@@ -43,15 +44,29 @@ export async function createProductionRecord(formData: FormData) {
   if (quantity <= 0) throw new Error("Üretilen adet pozitif bir tam sayı olmalıdır.");
 
   const date = dateStr ? new Date(dateStr) : new Date();
+  const fireQty = fireQtyStr ? Math.max(0, parseInt(fireQtyStr) || 0) : 0;
 
   const result = await executeProduction(productId, quantity, date, description || null);
+
+  // Fire kaydı — stok düşümü yok, sadece kayıt
+  if (fireQty > 0) {
+    await prisma.fireRecord.create({
+      data: {
+        productId,
+        quantity: fireQty,
+        date,
+        description: description ? `${description} (Fire)` : "Fire",
+      },
+    });
+  }
 
   revalidatePath("/uretim");
   revalidatePath("/hammaddeler");
   revalidatePath("/hareketler");
+  revalidatePath("/fire");
   revalidatePath("/");
 
-  return { success: true, data: result };
+  return { success: true, data: { ...result, fireQty } };
 }
 
 // ─────────────────────────────────────────────

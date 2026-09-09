@@ -59,6 +59,7 @@ model Product {
   shipmentRecords       ShipmentRecord[]
   pendingEntries        PendingEntry[]
   jobSchedules          JobSchedule[]
+  fireRecords           FireRecord[]
 
   @@map("products")
 }
@@ -276,4 +277,19 @@ model ProductCycleOverride {
   updatedAt DateTime @updatedAt
 
   @@map("product_cycle_overrides")
+}
+
+// ─────────────────────────────────────────────
+// Fire Kaydı (Fire Record)
+// ─────────────────────────────────────────────
+model FireRecord {
+  id          String   @id @default(cuid())
+  productId   String
+  quantity    Int                // Fire adedi
+  date        DateTime @default(now())
+  description String?
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@map("fire_records")
 }

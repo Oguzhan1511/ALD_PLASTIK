@@ -59,6 +59,7 @@ export function UretimClient({ products, recentProductions }: UretimClientProps)
   const [productSearch, setProductSearch] = useState("");
   const [showDropdown, setShowDropdown] = useState(false);
   const [quantity, setQuantity] = useState("");
+  const [fireQty, setFireQty] = useState("");
   const [description, setDescription] = useState("");
   const [date, setDate] = useState(getLocalISOTime());
   const [error, setError] = useState("");
@@ -115,6 +116,7 @@ export function UretimClient({ products, recentProductions }: UretimClientProps)
     const formData = new FormData();
     formData.set("productId", selectedProductId);
     formData.set("quantity", quantity);
+    formData.set("fireQty", fireQty);
     formData.set("description", description);
     formData.set("date", date);
 
@@ -126,6 +128,7 @@ export function UretimClient({ products, recentProductions }: UretimClientProps)
           setSelectedProductId("");
           setProductSearch("");
           setQuantity("");
+          setFireQty("");
           setDescription("");
           setDate(getLocalISOTime());
           window.location.reload();
@@ -225,6 +228,21 @@ export function UretimClient({ products, recentProductions }: UretimClientProps)
                   </div>
 
                   <div>
+                    <label className="form-label">Fire Adedi</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="1"
+                      value={fireQty}
+                      onChange={(e) => setFireQty(e.target.value)}
+                      className="form-input"
+                      placeholder="örn: 15"
+                      id="input-fire-adet"
+                    />
+                    <p className="text-xs text-slate-500 mt-1">Fire miktarı hammaddeden düşülmez, sadece kayıt amaçlıdır.</p>
+                  </div>
+
+                  <div>
                     <label className="form-label">Tarih & Saat *</label>
                     <input
                       type="datetime-local"
@@ -258,6 +276,7 @@ export function UretimClient({ products, recentProductions }: UretimClientProps)
                     <div className="alert-success">
                       <div className="font-semibold mb-2">
                         ✓ {result.quantity} adet {result.productName} üretildi!
+                        {(result as any).fireQty > 0 && ` (${(result as any).fireQty} adet fire kaydedildi)`}
                       </div>
                       <div className="text-xs space-y-1">
                         {result.movements.map((m, i) => (
