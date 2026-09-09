@@ -14,7 +14,9 @@ interface SummaryItem {
   productId: string;
   name: string;
   code: string | null;
-  total: number;
+  fireTotal: number;
+  productionTotal: number;
+  percentage: number;
 }
 
 interface FireClientProps {
@@ -31,7 +33,7 @@ const MONTHS = [
 
 export function FireClient({ initialRecords, summary, currentMonth, currentYear }: FireClientProps) {
   const router = useRouter();
-  const totalFire = summary.reduce((sum, item) => sum + item.total, 0);
+  const totalFire = summary.reduce((sum, item) => sum + item.fireTotal, 0);
 
   const handleMonthChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const [y, m] = e.target.value.split("-");
@@ -101,13 +103,24 @@ export function FireClient({ initialRecords, summary, currentMonth, currentYear 
                 ) : (
                   <ul className="divide-y divide-slate-100">
                     {summary.map((item) => (
-                      <li key={item.productId} className="flex items-center justify-between p-4 hover:bg-slate-50 transition-colors">
-                        <div className="min-w-0 flex-1">
-                          <p className="text-sm font-medium text-slate-800 truncate">{item.name}</p>
-                          {item.code && <p className="text-xs font-mono text-slate-400">{item.code}</p>}
+                      <li key={item.productId} className="flex flex-col p-4 hover:bg-slate-50 transition-colors">
+                        <div className="flex items-start justify-between mb-2">
+                          <div className="min-w-0 flex-1 pr-4">
+                            <p className="text-sm font-medium text-slate-800 truncate">{item.name}</p>
+                            {item.code && <p className="text-xs font-mono text-slate-400">{item.code}</p>}
+                          </div>
+                          <div className="text-sm font-bold text-red-600 bg-red-50 px-2.5 py-1 rounded-md shrink-0">
+                            {item.fireTotal.toLocaleString("tr-TR")} adet
+                          </div>
                         </div>
-                        <div className="text-sm font-bold text-red-600 bg-red-50 px-2.5 py-1 rounded-md ml-4">
-                          {item.total.toLocaleString("tr-TR")}
+                        <div className="flex items-center justify-between text-xs text-slate-500 bg-slate-50/50 p-2 rounded border border-slate-100">
+                          <div>
+                            Üretim: <span className="font-medium text-slate-700">{item.productionTotal.toLocaleString("tr-TR")}</span>
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                            Oran: <span className="font-medium text-amber-700">%{item.percentage.toLocaleString("tr-TR", { maximumFractionDigits: 2 })}</span>
+                          </div>
                         </div>
                       </li>
                     ))}
