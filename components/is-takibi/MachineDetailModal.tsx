@@ -4,7 +4,7 @@ import { useState } from "react";
 import JobModal from "./JobModal";
 import { deleteJobSchedule } from "@/lib/actions/is-takibi";
 
-export default function MachineDetailModal({ machine, date, schedules, products, rawMaterials, onClose, onRefresh }: any) {
+export default function MachineDetailModal({ machine, date, schedules, products, rawMaterials, cycleOverrides, onClose, onRefresh }: any) {
   const [isJobModalOpen, setIsJobModalOpen] = useState(false);
   const [selectedJob, setSelectedJob] = useState<any | null>(null);
 
@@ -158,6 +158,7 @@ export default function MachineDetailModal({ machine, date, schedules, products,
           job={selectedJob}
           products={products}
           rawMaterials={rawMaterials}
+          cycleOverrides={cycleOverrides}
           onClose={() => setIsJobModalOpen(false)}
           onRefresh={() => {
             setIsJobModalOpen(false);
@@ -165,6 +166,7 @@ export default function MachineDetailModal({ machine, date, schedules, products,
           }}
         />
       )}
+
     </div>
   );
 }

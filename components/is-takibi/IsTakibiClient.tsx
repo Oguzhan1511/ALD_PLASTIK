@@ -2,13 +2,17 @@
 
 import { useState, useEffect } from "react";
 import { getJobSchedules, updateJobSchedule } from "@/lib/actions/is-takibi";
+import { getProductCycleOverrides } from "@/lib/actions/product-cycles";
 import MachineDetailModal from "./MachineDetailModal";
+import ProductCyclesModal from "./ProductCyclesModal";
 
 export default function IsTakibiClient({ machines, products, rawMaterials, initialDate, initialSchedules, ustaToken }: any) {
   const [date, setDate] = useState(initialDate);
   const [schedules, setSchedules] = useState(initialSchedules);
   const [isLoading, setIsLoading] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [showCyclesModal, setShowCyclesModal] = useState(false);
+  const [cycleOverrides, setCycleOverrides] = useState<Record<string, { cavity: number; cycle: number }>>({});
   
   const [selectedMachine, setSelectedMachine] = useState<any | null>(null);
 
@@ -19,6 +23,15 @@ export default function IsTakibiClient({ machines, products, rawMaterials, initi
     window.addEventListener("job-schedule-updated", handleJobUpdate);
     return () => window.removeEventListener("job-schedule-updated", handleJobUpdate);
   }, [date]);
+
+  useEffect(() => {
+    getProductCycleOverrides().then(setCycleOverrides).catch(() => {});
+  }, []);
+
+  const refreshOverrides = async () => {
+    const updated = await getProductCycleOverrides();
+    setCycleOverrides(updated);
+  };
 
   const handleDateChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const newDate = e.target.value;
@@ -40,6 +53,7 @@ export default function IsTakibiClient({ machines, products, rawMaterials, initi
     const newSchedules = await getJobSchedules(date);
     setSchedules(newSchedules);
   };
+
 
   const handleCopyLink = () => {
     const url = `${window.location.origin}/u/${ustaToken}/is-takibi`;
@@ -65,23 +79,43 @@ export default function IsTakibiClient({ machines, products, rawMaterials, initi
           {isLoading && <span className="text-sm text-gray-500 animate-pulse">Yükleniyor...</span>}
         </div>
         
-        <button
-          onClick={handleCopyLink}
-          className="flex items-center justify-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 rounded-lg text-sm font-medium transition-colors border border-indigo-200"
-        >
-          {copied ? (
-            <>
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-              Kopyalandı!
-            </>
-          ) : (
-            <>
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" /></svg>
-              Ustalar İçin Linki Kopyala
-            </>
-          )}
-        </button>
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={() => setShowCyclesModal(true)}
+            className="flex items-center justify-center gap-2 px-4 py-2 bg-amber-50 text-amber-700 hover:bg-amber-100 rounded-lg text-sm font-medium transition-colors border border-amber-200"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            Ürün Süreleri
+          </button>
+
+          <button
+            onClick={handleCopyLink}
+            className="flex items-center justify-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 rounded-lg text-sm font-medium transition-colors border border-indigo-200"
+          >
+            {copied ? (
+              <>
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                Kopyalandı!
+              </>
+            ) : (
+              <>
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" /></svg>
+                Ustalar İçin Linki Kopyala
+              </>
+            )}
+          </button>
+        </div>
       </div>
+
+      {showCyclesModal && (
+        <ProductCyclesModal
+          onClose={() => setShowCyclesModal(false)}
+          onUpdated={refreshOverrides}
+        />
+      )}
+
 
       <h2 className="text-xl font-bold text-gray-800 mb-4">Planlanan İşler</h2>
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
@@ -127,10 +161,12 @@ export default function IsTakibiClient({ machines, products, rawMaterials, initi
           schedules={activeSchedules.filter((s: any) => s.machineId === selectedMachine.id)}
           products={products}
           rawMaterials={rawMaterials}
+          cycleOverrides={cycleOverrides}
           onClose={() => setSelectedMachine(null)}
           onRefresh={refreshSchedules}
         />
       )}
+
 
       {/* İş Takip Geçmişi */}
       {completedSchedules.length > 0 && (

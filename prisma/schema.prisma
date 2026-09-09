@@ -264,3 +264,16 @@ model JobSchedule {
 
   @@map("job_schedules")
 }
+
+// ─────────────────────────────────────────────
+// Ürün Çevrim Süresi Özelleştirme (Product Cycle Override)
+// ─────────────────────────────────────────────
+model ProductCycleOverride {
+  id        String   @id @default(cuid())
+  code      String   @unique // Ürün kodu (örn. "641274Z02")
+  cavity    Int                // Kalıp adedi
+  cycle     Int                // Çevrim süresi (saniye)
+  updatedAt DateTime @updatedAt
+
+  @@map("product_cycle_overrides")
+}

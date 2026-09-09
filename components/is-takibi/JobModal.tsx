@@ -4,7 +4,7 @@ import { useState } from "react";
 import { createJobSchedule, updateJobSchedule, completeJobSchedule } from "@/lib/actions/is-takibi";
 import { PRODUCT_CYCLES } from "@/lib/utils/product-cycles";
 
-export default function JobModal({ machine, date, job, products, rawMaterials, onClose, onRefresh }: any) {
+export default function JobModal({ machine, date, job, products, rawMaterials, cycleOverrides, onClose, onRefresh }: any) {
   const isEdit = !!job;
   
   // Düzenleme modundaysak, bitiş saatinden başlangıç saatini çıkarıp süreyi (saat) bulalım
@@ -60,10 +60,14 @@ export default function JobModal({ machine, date, job, products, rawMaterials, o
     if (currentExpectedQty && currentProductId && Number(currentExpectedQty) > 0) {
        const selectedProduct = products.find((p: any) => p.id === currentProductId);
        if (selectedProduct && selectedProduct.code) {
-         const cycleInfo = PRODUCT_CYCLES.find(c => c.code === selectedProduct.code);
-         if (cycleInfo) {
-           const totalCycles = Math.ceil(Number(currentExpectedQty) / cycleInfo.cavity);
-           const totalSeconds = totalCycles * cycleInfo.cycle;
+         // Supabase override varsa onu, yoksa varsayılan PRODUCT_CYCLES değerini kullan
+         const baseInfo = PRODUCT_CYCLES.find(c => c.code === selectedProduct.code);
+         const override = cycleOverrides?.[selectedProduct.code];
+         const cavity = override?.cavity ?? baseInfo?.cavity;
+         const cycle = override?.cycle ?? baseInfo?.cycle;
+         if (cavity && cycle) {
+           const totalCycles = Math.ceil(Number(currentExpectedQty) / cavity);
+           const totalSeconds = totalCycles * cycle;
            const hours = totalSeconds / 3600;
            updates.durationHours = Number(hours.toFixed(2));
          }
@@ -72,6 +76,7 @@ export default function JobModal({ machine, date, job, products, rawMaterials, o
 
     setFormData(prev => ({ ...prev, ...updates }));
   };
+
 
   const getRawMaterialInfo = () => {
     if (!formData.productId) return [];
